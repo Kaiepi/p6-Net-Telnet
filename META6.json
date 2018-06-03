@@ -1,0 +1,22 @@
+{
+  "authors" : [
+    "Ben Davies"
+  ],
+  "build-depends" : [ ],
+  "depends" : [ ],
+  "description" : "Telnet library for clients and servers",
+  "license" : "Artistic-2.0",
+  "name" : "Net::Telnet",
+  "perl" : "6.c",
+  "provides" : {
+    "Net::Telnet" : "lib/Net/Telnet.pm6",
+    "Net::Telnet::Command" : "lib/Net/Telnet/Command.pm6",
+    "Net::Telnet::Client" : "lib/Net/Telnet/Client.pm6",
+    "Net::Telnet::Server" : "lib/Net/Telnet/Server.pm6"
+  },
+  "resources" : [ ],
+  "source-url" : "git@github.com:Kaiepi/p6-Net-Telnet.git",
+  "tags" : [ "Net" ],
+  "test-depends" : [ ],
+  "version" : "0.0.1"
+}
