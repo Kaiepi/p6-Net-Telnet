@@ -1,5 +1,5 @@
 use v6.c;
-use Net::Telnet::Command;
+use Net::Telnet::Chunk;
 unit class Net::Telnet::Client;
 
 has IO::Socket::Async $.socket;
@@ -23,12 +23,11 @@ multi method connect(::?CLASS:D: Str $host, Int $port = 23 --> Promise) {
 }
 
 method parse(Blob $data) {
-    for $data.contents -> $byte {
-        given $byte {
-            when TelnetCommand($byte) { proceed } # TODO
-            default { print .chr }
-        }
-    }
+    my $match = Net::Telnet::Chunk::Grammar.parse(
+        $data.decode('latin1'),
+        actions => Net::Telnet::Chunk::Actions.new
+    );
+    .say for $match.made;
 }
 
 multi method send(Blob $data) { $!socket.write($data) }

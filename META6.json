@@ -10,7 +10,7 @@
   "perl" : "6.c",
   "provides" : {
     "Net::Telnet" : "lib/Net/Telnet.pm6",
-    "Net::Telnet::Command" : "lib/Net/Telnet/Command.pm6",
+    "Net::Telnet::Chunk" : "lib/Net/Telnet/Command.pm6",
     "Net::Telnet::Client" : "lib/Net/Telnet/Client.pm6",
     "Net::Telnet::Server" : "lib/Net/Telnet/Server.pm6"
   },
