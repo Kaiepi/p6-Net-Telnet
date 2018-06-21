@@ -4,6 +4,8 @@ unit class Net::Telnet::Client;
 
 has IO::Socket::Async $.socket;
 
+has Buf $!parser-buf .= new;
+
 method host(--> Str) { $!socket.peer-host }
 method port(--> Int) { $!socket.peer-port }
 
@@ -23,11 +25,13 @@ multi method connect(::?CLASS:D: Str $host, Int $port = 23 --> Promise) {
 }
 
 method parse(Blob $data) {
+    my $buf = $!parser-buf.elems ?? $!parser-buf.splice.append($data) !! $data;
     my $match = Net::Telnet::Chunk::Grammar.parse(
-        $data.decode('latin1'),
+        $buf.decode('latin1'),
         actions => Net::Telnet::Chunk::Actions.new
     );
     .say for $match.made;
+    $!parser-buf = $data.subbuf($match.to) if $match.to < $data.elems;
 }
 
 multi method send(Blob $data) { $!socket.write($data) }
