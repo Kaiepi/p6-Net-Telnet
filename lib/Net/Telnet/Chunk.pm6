@@ -123,16 +123,13 @@ class Subnegotiation::NAWS does Subnegotiation {
 }
 
 grammar Grammar {
-    token TOP {
-        :my TelnetOption $*NEGOTIATION;
-        <chunk>+
-    }
+    token TOP { <chunk>+ }
 
     token chunk {
-        | <subnegotiation>
-        | <negotiation>
-        | <command>
-        | <data>
+        || <data>
+        || <subnegotiation>
+        || <negotiation>
+        || <command>
     }
 
     # All bytes passed are encoded as latin1.
