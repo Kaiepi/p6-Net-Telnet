@@ -26,7 +26,7 @@ multi method connect(::?CLASS:D: Str $host, Int $port = 23 --> Promise) {
 
 method parse(Blob $data) {
     my $buf = $!parser-buf.elems ?? $!parser-buf.splice.append($data) !! $data;
-    my $match = Net::Telnet::Chunk::Grammar.parse(
+    my $match = Net::Telnet::Chunk::Grammar.subparse(
         $buf.decode('latin1'),
         actions => Net::Telnet::Chunk::Actions.new
     );
