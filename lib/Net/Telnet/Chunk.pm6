@@ -85,7 +85,9 @@ class Command {
 
     method gist(--> Str) { "{IAC.key} {$!command.key}" }
 
-    method Str(--> Str) { "{IAC}$!command" }
+    method serialize(--> Blob) { Blob.new: IAC.ord, $!command.ord }
+
+    method Str(--> Str) { "{IAC}{$!command}" }
 }
 
 class Negotiation {
@@ -94,41 +96,62 @@ class Negotiation {
 
     method gist(--> Str) { "{IAC.key} {$!command.key} {$!option.key}" }
 
-    method Str(--> Str) { "{IAC}$!command$!option" }
+    method serialize(--> Blob) { Blob.new: IAC.ord, $!command.ord, $!option.ord }
+
+    method Str(--> Str) { self.serialize.decode('latin1') }
 }
 
-role Subnegotiation {
-    has TelnetCommand $.begin;
-    has TelnetOption  $.option;
-    has TelnetCommand $.end;
+subset UInt8  of Int where 0..0xFF;
+subset UInt16 of Int where 0..0xFFFF;
 
-    proto method gist(--> Str) { "{IAC.key} {$!begin.key} {$!option.key} {{*}} {IAC.key} {$!end.key}" }
+role Subnegotiation {
+    has TelnetOption $.option;
+
+    method new(UInt8 :$width, UInt8 :$height) {
+        my $option = NAWS;
+        self.bless(:$option, :$width, :$height);
+    }
+
+    proto method gist(--> Str) {
+        "{IAC.key} {SB.key} {$!option.key} {{*}} {IAC.key} {SE.key}"
+    }
     multi method gist(--> Str) { '' }
 
-    proto method Str(--> Str) { "{IAC}$!begin$!option{{*}}{IAC}$!end" }
-    multi method Str(--> Str) { '' }
+    proto method serialize(--> Blob) {
+        Blob.new(
+            IAC.ord,
+            SB.ord,
+            $!option.ord,
+            |{*}.contents.reduce({ ($^b == 0xFF) ?? [|$^a, $^b, $^b] !! [|$^a, $^b] }),
+            IAC.ord,
+            SE.ord
+        )
+    }
+    multi method serialize(--> Blob) { Blob.new }
+
+    method Str(--> Str) { self.serialize.decode('latin1') }
 }
 
 class Subnegotiation::NAWS does Subnegotiation {
-    has Int $.width;
-    has Int $.height;
+    has UInt16 $.width;
+    has UInt16 $.height;
 
-    method new(:$option, :$begin, :$end, :@bytes) {
-        my Int ($width-upper, $width-lower, $height-upper, $height-lower) = @bytes;
-        my $width  = $width-upper  +< 8 +| $width-lower;
-        my $height = $height-upper +< 8 +| $height-lower;
-        self.bless: :$option, :$begin, :$end, :$width, :$height;
+    method new(UInt16 :$width, UInt16 :$height) {
+        my $option = NAWS;
+        self.bless(:$option, :$width, :$height)
     }
 
-    multi method gist(--> Str) { "$!width $!height" }
+    multi method gist(--> Str) {
+        "$!width $!height"
+    }
 
-    multi method Str(--> Str) {
-        my Blob $bytes .= new:
-            $!width +> 8,
-            $!width +& 0xFF,
+    multi method serialize(--> Blob) {
+        Blob.new([
+            $!width  +> 8,
+            $!width  +& 0xFF,
             $!height +> 8,
-            $!height +& 0xFF;
-        $bytes.decode;
+            $!height +& 0xFF
+        ])
     }
 }
 
@@ -137,90 +160,76 @@ grammar Grammar {
 
     token chunk {
         || <data>
-        || <subnegotiation>
-        || <negotiation>
         || <command>
+        || <negotiation>
+        || <subnegotiation>
     }
 
-    # All bytes passed are encoded as latin1.
-    token byte { . }
     # TELNET data is ASCII encoded. xtended ASCII is supported, but characters
     # outside the normal ASCII range are sent as XASCII subnegotiations.
     token data { <:ascii>+ }
 
-    proto token command {*}
-    token command:sym(SE)   { <{IAC}> <( <sym> )> }
-    token command:sym(NOP)  { <{IAC}> <( <sym> )> }
-    token command:sym(DM)   { <{IAC}> <( <sym> )> }
-    token command:sym(BRK)  { <{IAC}> <( <sym> )> }
-    token command:sym(IP)   { <{IAC}> <( <sym> )> }
-    token command:sym(AO)   { <{IAC}> <( <sym> )> }
-    token command:sym(AYT)  { <{IAC}> <( <sym> )> }
-    token command:sym(EC)   { <{IAC}> <( <sym> )> }
-    token command:sym(EL)   { <{IAC}> <( <sym> )> }
-    token command:sym(GA)   { <{IAC}> <( <sym> )> }
-    token command:sym(SB)   { <{IAC}> <( <sym> )> }
-    token command:sym(WILL) { <{IAC}> <( <sym> )> }
-    token command:sym(WONT) { <{IAC}> <( <sym> )> }
-    token command:sym(DO)   { <{IAC}> <( <sym> )> }
-    token command:sym(DONT) { <{IAC}> <( <sym> )> }
+    token command {
+        \x[FF]
+        <command=[\x[F0]..\x[F9]]>
+    }
 
     token negotiation {
-        [
-        | <command:sym(WILL)>
-        | <command:sym(WONT)>
-        | <command:sym(DO)>
-        | <command:sym(DONT)>
-        ]
-        <option=byte>
+        \x[FF]
+        <command=[\x[FB]..\x[FE]]>
+        <option=[\x[00]..\x[FF]]>
+    }
+
+    token byte {
+        || \x[FF] <(\x[FF])>
+        || <[\x[00]..\x[FE]]>
     }
 
     proto token subnegotiation {*}
     token subnegotiation:sym(NAWS) {
-        <begin=command:sym(SB)>
-        <option=sym>
+        $(IAC)
+        $(SB)
+        <.sym>
         <byte> ** 4
-        <end=command:sym(SE)>
+        $(IAC)
+        $(SE)
     }
 }
 
 class Actions {
     method TOP($/) { make $<chunk>».ast }
 
-    method chunk($/) { make $<data>.ast // $<subnegotiation>.ast // $<negotiation>.ast // $<command>.ast }
+    method chunk($/) {
+        given $/ {
+            when $<data>           { make $<data>.ast           }
+            when $<command>        { make $<command>.ast        }
+            when $<negotiation>    { make $<negotiation>.ast    }
+            when $<subnegotiation> { make $<subnegotiation>.ast }
+        }
+    }
 
     method data($/ --> Str) { make ~$/ }
 
     method byte($/ --> Int) { make $/.ord }
 
-    method !make-command($/ --> Command) {
-        make Command.new(command => TelnetCommand(~$<sym>))
+    method command($/ --> Command) {
+        make Command.new(command => TelnetCommand(~$<command>))
     }
-    method command:sym(SE)($/ --> Command)  { self!make-command($/) }
-    method command:sym(NOP)($/ --> Command) { self!make-command($/) }
-    method command:sym(DM)($/ --> Command)  { self!make-command($/) }
-    method command:sym(BRK)($/ --> Command) { self!make-command($/) }
-    method command:sym(IP)($/ --> Command)  { self!make-command($/) }
-    method command:sym(AO)($/ --> Command)  { self!make-command($/) }
-    method command:sym(AYT)($/ --> Command) { self!make-command($/) }
-    method command:sym(EC)($/ --> Command)  { self!make-command($/) }
-    method command:sym(EL)($/ --> Command)  { self!make-command($/) }
-    method command:sym(GA)($/ --> Command)  { self!make-command($/) }
-    method command:sym(SB)($/ --> Command)  { self!make-command($/) }
 
     method negotiation($/ --> Negotiation) {
         make Negotiation.new(
             command => TelnetCommand(~$<command>),
-            option => TelnetOption(~$<option>)
-        );
+            option  => TelnetOption(~$<option>)
+        )
     }
 
     method subnegotiation:sym(NAWS)($/ --> Subnegotiation::NAWS) {
+        my @bytes  = $<byte>».ast;
+        my $width  = @bytes[0] +< 8 +| @bytes[1];
+        my $height = @bytes[2] +< 8 +| @bytes[3];
         make Subnegotiation::NAWS.new(
-            option => TelnetOption(~$<option>),
-            begin => TelnetCommand(~$<begin>),
-            end => TelnetCommand(~$<end>),
-            bytes => make $<byte>».ast
+            width  => $width,
+            height => $height
         )
     }
 }
