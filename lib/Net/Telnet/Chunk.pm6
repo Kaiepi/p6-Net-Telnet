@@ -83,18 +83,18 @@ class Command {
     method name  { $!command.key   }
     method value { $!command.value }
 
-    method gist(--> Str) { "{IAC.key} $!command.key" }
+    method gist(--> Str) { "{IAC.key} {$!command.key}" }
 
-    method Str(--> Str) { self.gist }
+    method Str(--> Str) { "{IAC}$!command" }
 }
 
 class Negotiation {
     has TelnetCommand $.command;
     has TelnetOption  $.option;
 
-    method gist(--> Str) { "$!command {$!option.key}" }
+    method gist(--> Str) { "{IAC.key} {$!command.key} {$!option.key}" }
 
-    method Str(--> Str) { self.gist }
+    method Str(--> Str) { "{IAC}$!command$!option" }
 }
 
 role Subnegotiation {
@@ -102,10 +102,11 @@ role Subnegotiation {
     has TelnetOption  $.option;
     has TelnetCommand $.end;
 
-    proto method gist(--> Str) { "$!begin {$!option.key} {{*}} $!end" }
-    multi method gist(--> Str) { '' } # Overridden by classes implementing this.
+    proto method gist(--> Str) { "{IAC.key} {$!begin.key} {$!option.key} {{*}} {IAC.key} {$!end.key}" }
+    multi method gist(--> Str) { '' }
 
-    method Str(--> Str) { self.gist }
+    proto method Str(--> Str) { "{IAC}$!begin$!option{{*}}{IAC}$!end" }
+    multi method Str(--> Str) { '' }
 }
 
 class Subnegotiation::NAWS does Subnegotiation {
@@ -120,6 +121,15 @@ class Subnegotiation::NAWS does Subnegotiation {
     }
 
     multi method gist(--> Str) { "$!width $!height" }
+
+    multi method Str(--> Str) {
+        my Blob $bytes .= new:
+            $!width +> 8,
+            $!width +& 0xFF,
+            $!height +> 8,
+            $!height +& 0xFF;
+        $bytes.decode;
+    }
 }
 
 grammar Grammar {
