@@ -98,7 +98,7 @@ class Negotiation {
 
     method serialize(--> Blob) { Blob.new: IAC.ord, $!command.ord, $!option.ord }
 
-    method Str(--> Str) { self.serialize.decode('latin1') }
+    method Str(--> Str) { "{IAC}{$!command}{$!option}" }
 }
 
 subset UInt8  of Int where 0..0xFF;
@@ -107,15 +107,9 @@ subset UInt16 of Int where 0..0xFFFF;
 role Subnegotiation {
     has TelnetOption $.option;
 
-    method new(UInt8 :$width, UInt8 :$height) {
-        my $option = NAWS;
-        self.bless(:$option, :$width, :$height);
-    }
-
     proto method gist(--> Str) {
         "{IAC.key} {SB.key} {$!option.key} {{*}} {IAC.key} {SE.key}"
     }
-    multi method gist(--> Str) { '' }
 
     proto method serialize(--> Blob) {
         Blob.new(
@@ -127,7 +121,6 @@ role Subnegotiation {
             SE.ord
         )
     }
-    multi method serialize(--> Blob) { Blob.new }
 
     method Str(--> Str) { self.serialize.decode('latin1') }
 }
@@ -141,17 +134,17 @@ class Subnegotiation::NAWS does Subnegotiation {
         self.bless(:$option, :$width, :$height)
     }
 
-    multi method gist(--> Str) {
+    only method gist(--> Str) {
         "$!width $!height"
     }
 
-    multi method serialize(--> Blob) {
-        Blob.new([
+    only method serialize(--> Blob) {
+        Blob.new(
             $!width  +> 8,
             $!width  +& 0xFF,
             $!height +> 8,
             $!height +& 0xFF
-        ])
+        )
     }
 }
 
@@ -165,13 +158,13 @@ grammar Grammar {
         || <subnegotiation>
     }
 
-    # TELNET data is ASCII encoded. xtended ASCII is supported, but characters
+    # TELNET data is ASCII encoded. Extended ASCII is supported, but characters
     # outside the normal ASCII range are sent as XASCII subnegotiations.
     token data { <:ascii>+ }
 
     token command {
         \x[FF]
-        <command=[\x[F0]..\x[F9]]>
+        <command=[\x[F1]..\x[F9]]>
     }
 
     token negotiation {
@@ -181,18 +174,16 @@ grammar Grammar {
     }
 
     token byte {
-        || \x[FF] <(\x[FF])>
         || <[\x[00]..\x[FE]]>
+        || \x[FF] <(\x[FF])>
     }
 
     proto token subnegotiation {*}
     token subnegotiation:sym(NAWS) {
-        $(IAC)
-        $(SB)
+        \x[FF] \x[FA]
         <.sym>
         <byte> ** 4
-        $(IAC)
-        $(SE)
+        \x[FF] \x[F0]
     }
 }
 
@@ -210,8 +201,6 @@ class Actions {
 
     method data($/ --> Str) { make ~$/ }
 
-    method byte($/ --> Int) { make $/.ord }
-
     method command($/ --> Command) {
         make Command.new(command => TelnetCommand(~$<command>))
     }
@@ -222,6 +211,8 @@ class Actions {
             option  => TelnetOption(~$<option>)
         )
     }
+
+    method byte($/ --> UInt8) { make $/.ord }
 
     method subnegotiation:sym(NAWS)($/ --> Subnegotiation::NAWS) {
         my @bytes  = $<byte>».ast;
