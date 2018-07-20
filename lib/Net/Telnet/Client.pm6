@@ -17,7 +17,7 @@ multi method connect(::?CLASS:D: Str $host, Int $port = 23 --> Promise) {
     IO::Socket::Async.connect($host, $port).then(-> $p {
         my Buf[uint8] $buf .= new;
         $!socket = $p.result;
-        $!socket.Supply(:bin, :$buf).tap(-> $data {
+        $!socket.Supply(:bin, :$buf).act(-> $data {
             self.parse($data);
         });
         self;
