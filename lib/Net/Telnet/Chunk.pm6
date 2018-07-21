@@ -110,6 +110,7 @@ role Subnegotiation {
     proto method gist(--> Str) {
         "{IAC.key} {SB.key} {$!option.key} {{*}} {IAC.key} {SE.key}"
     }
+    multi method gist(--> Str) { '' }
 
     proto method serialize(--> Blob) {
         Blob.new(
@@ -121,6 +122,7 @@ role Subnegotiation {
             SE.ord
         )
     }
+    multi method serialize(--> Blob) { Blob.new }
 
     method Str(--> Str) { self.serialize.decode('latin1') }
 }
@@ -134,11 +136,11 @@ class Subnegotiation::NAWS does Subnegotiation {
         self.bless(:$option, :$width, :$height)
     }
 
-    only method gist(--> Str) {
+    multi method gist(--> Str) {
         "$!width $!height"
     }
 
-    only method serialize(--> Blob) {
+    multi method serialize(--> Blob) {
         Blob.new(
             $!width  +> 8,
             $!width  +& 0xFF,
@@ -174,8 +176,8 @@ grammar Grammar {
     }
 
     token byte {
-        || <[\x[00]..\x[FE]]>
-        || \x[FF] <(\x[FF])>
+        | <[\x[00]..\x[FE]]>
+        | \x[FF] <(\x[FF])>
     }
 
     proto token subnegotiation {*}
