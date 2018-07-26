@@ -10,8 +10,8 @@ my $client;
 lives-ok {
     $client = await Net::Telnet::Client.connect('127.0.0.1', 8000);
 }, 'Can open new connections';
-is $client.host, '127.0.0.1', 'Can get connection host';
-is $client.port, 8000, 'Can get connection port';
+is $client.peer-host, '127.0.0.1', 'Can get connection host';
+is $client.peer-port, 8000, 'Can get connection port';
 is $client.closed, False, 'Can get connection closed state';
 
 $client.close;
