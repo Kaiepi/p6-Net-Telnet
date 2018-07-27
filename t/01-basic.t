@@ -1,23 +1,34 @@
 use v6.c;
-use Test;
+use Net::Telnet::Chunk;
 use Net::Telnet::Client;
+use Net::Telnet::Option;
+use Test;
 
-plan 6;
+plan 12;
 
-my $server = IO::Socket::INET.listen('127.0.0.1', 8000);
-my $client;
+my IO::Socket::INET    $server .= listen: '127.0.0.1', 8000;
+my Net::Telnet::Client $client .= new: :host<127.0.0.1>, :8000port, :options<SGA ECHO>;
 
-lives-ok {
-    $client = await Net::Telnet::Client.connect('127.0.0.1', 8000);
-}, 'Can open new connections';
-is $client.peer-host, '127.0.0.1', 'Can get connection host';
-is $client.peer-port, 8000, 'Can get connection port';
+lives-ok { await $client.connect }, 'Can open new connections';
+is $client.host, '127.0.0.1', 'Can get connection host';
+is $client.port, 8000, 'Can get connection port';
 is $client.closed, False, 'Can get connection closed state';
+cmp-ok $client.options{SGA}, '~~', Net::Telnet::Option, 'Can get connection options';
+is $client.options{SGA}.supported, True, 'Can support options by passing them through .new';
+
+$client.parse(Blob.new: IAC.ord, DO.ord, SGA.ord);
+is $client.options{SGA}.us, YES, 'Can negotiate DO with supported options';
+$client.parse(Blob.new: IAC.ord, DONT.ord, SGA.ord);
+is $client.options{SGA}.us, NO, 'Can negotiate DONT with supported options';
+$client.parse(Blob.new: IAC.ord, WILL.ord, SGA.ord);
+is $client.options{SGA}.them, YES, 'Can negotiate WILL with supported options';
+$client.parse(Blob.new: IAC.ord, WONT.ord, SGA.ord);
+is $client.options{SGA}.them, NO, 'Can negotiate WONT with supported options';
 
 $client.close;
 is $client.closed, True, 'Connection closed state is accurate after the client closes the connection';
 
-$client = await Net::Telnet::Client.connect('127.0.0.1', 8000);
+await $client.connect;
 $server.close;
 sleep 0.000001;
 is $client.closed, True, 'Connection closed state is accurate after the server closes the connection';
