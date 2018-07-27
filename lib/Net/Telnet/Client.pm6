@@ -254,3 +254,88 @@ method close(--> Bool) {
     $!parser-buf .= new;
     True
 }
+
+=begin pod
+
+=head1 NAME
+
+Net::Telnet::Client - Telnet client library
+
+=head1 DESCRIPTION
+
+Net::Telnet::Client is a library for creating Telnet clients. 
+
+=head1 SYNOPSIS
+
+    use Net::Telnet::Client;
+
+    my Net::Telnet::Client $client .= new: :host<telehack.com>, :options<ECHO SGA>;
+    $client.text.tap(-> $text { $text.print });
+    await $client.connect;
+    await $client.send("cowsay ayy lmao\r\n");
+
+=head1 ATTRIBUTES
+
+=item Str I<$.host>
+
+The host with which the client will connect.
+
+=item Int I<$.port>
+
+The port with which the client will connect.
+
+=item IO::Socket::Async I<$.socket>
+
+The connection object.
+
+=item Bool I<$.closed>
+
+Whether or not the connection is currently closed.
+
+=item Map I<$.options>
+
+A map of the state of all options the client is aware of. Its shape is
+C«(Net::Telnet::Chunk::TelnetOption => Net::Telnet::Option)».
+
+=head1 METHODS
+
+=item B<text>(--> Supply)
+
+Returns the supply to which text received by the client is emitted.
+
+=item B<new>(Str :$host, Int :$port, :@options --> Net::Telnet::Client)
+
+Initializes a Telnet client. C<$host> and C<$port> are used by C<.connect> to
+connect to a server. C<@options> is an array of strings representing the
+options the client should support. Currently, the following options are
+supported:
+
+=defn ECHO
+Echo
+
+=defn SGA
+Suppress go-ahead
+
+=item B<connect>(--> Promise)
+
+Connects the client to a server given the host and port provided in C<.new>.
+The promise returned is resolved once the connection has begun.
+
+=item B<send>(Blob I<$data> --> Promise)
+=item B<send>(Str I<$data> --> Promise)
+
+Sends a message to the server.
+
+=item B<parse>(Blob I<$data>)
+
+Parses messages received from the server.
+
+=item B<close>(--> Bool)
+
+Closes the connection to the server, if any is open.
+
+=head1 AUTHOR
+
+Ben Davies (kaiepi)
+
+=end pod

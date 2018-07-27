@@ -9,13 +9,21 @@ Net::Telnet - Telnet library for clients and servers
 
 =head1 SYNOPSIS
 
-    use Net::Telnet;
+    use Net::Telnet::Client;
+
+    my Net::Telnet::Client $client .= new: :host<telehack.com>, :options<ECHO SGA>;
+    $client.text.tap({ .print });
+    await $client.connect;
+    await $client.send("cowsay ayy lmao\r\n");
+
+    use Net::Telnet::Server;
 
     # TODO
 
 =head1 DESCRIPTION
 
-Net::Telnet is a library for creating Telnet clients and servers.
+Net::Telnet is a library for creating Telnet clients and servers. See
+C<Net::Telnet::Client> and C<Net::Telnet::Server> for more documentation.
 
 =head1 AUTHOR
 
