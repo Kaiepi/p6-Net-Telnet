@@ -8,11 +8,14 @@ constant SUPPORTED = <ECHO SGA>;
 has Str               $.host;
 has Int               $.port;
 has IO::Socket::Async $.socket;
-has Bool              $.closed = True;
+has Bool              $.closed   = True;
+has Supplier          $.text    .= new;
 has Map               $.options;
 
 has Net::Telnet::Chunk::Actions $!actions    .= new;
 has Blob                        $!parser-buf .= new;
+
+method text(--> Supply) { $!text.Supply }
 
 method new(Str :$host, Int :$port = 23, :@options? --> ::?CLASS:D) {
     my Map $options .= new: TelnetOption.enums.kv.map: -> $k, $v {
@@ -68,7 +71,7 @@ method parse(Blob $data) {
                 say '[RECV] ', $chunk;
             }
             when Str {
-                .print;
+                $!text.emit($chunk);
             }
         }
     }

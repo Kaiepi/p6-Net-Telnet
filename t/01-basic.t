@@ -4,7 +4,7 @@ use Net::Telnet::Client;
 use Net::Telnet::Option;
 use Test;
 
-plan 12;
+plan 13;
 
 my IO::Socket::INET    $server .= listen: '127.0.0.1', 8000;
 my Net::Telnet::Client $client .= new: :host<127.0.0.1>, :8000port, :options<SGA ECHO>;
@@ -24,6 +24,12 @@ $client.parse(Blob.new: IAC.ord, WILL.ord, SGA.ord);
 is $client.options{SGA}.them, YES, 'Can negotiate WILL with supported options';
 $client.parse(Blob.new: IAC.ord, WONT.ord, SGA.ord);
 is $client.options{SGA}.them, NO, 'Can negotiate WONT with supported options';
+
+$client.text.act(-> $text {
+    is $text, 'ayy lmao', 'Can emit text messages received';
+});
+$client.parse('ayy lmao'.encode('latin1'));
+sleep 0.000001;
 
 $client.close;
 is $client.closed, True, 'Connection closed state is accurate after the client closes the connection';
