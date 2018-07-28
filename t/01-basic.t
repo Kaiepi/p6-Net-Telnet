@@ -7,7 +7,7 @@ use Test;
 plan 13;
 
 my IO::Socket::INET    $server .= listen: '127.0.0.1', 8000;
-my Net::Telnet::Client $client .= new: :host<127.0.0.1>, :8000port, :options<SGA ECHO>;
+my Net::Telnet::Client $client .= new: :host<127.0.0.1>, :8000port, :supported<SGA ECHO>;
 
 lives-ok { await $client.connect }, 'Can open new connections';
 is $client.host, '127.0.0.1', 'Can get connection host';

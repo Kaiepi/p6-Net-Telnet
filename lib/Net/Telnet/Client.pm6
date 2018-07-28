@@ -3,8 +3,6 @@ use Net::Telnet::Chunk;
 use Net::Telnet::Option;
 unit class Net::Telnet::Client;
 
-constant SUPPORTED = <ECHO SGA>;
-
 has Str               $.host;
 has Int               $.port;
 has IO::Socket::Async $.socket;
@@ -17,11 +15,11 @@ has Blob                        $!parser-buf .= new;
 
 method text(--> Supply) { $!text.Supply }
 
-method new(Str :$host, Int :$port = 23, :@options? --> ::?CLASS:D) {
+method new(Str :$host, Int :$port = 23, :@preferred, :@supported --> ::?CLASS:D) {
     my Map $options .= new: TelnetOption.enums.kv.map: -> $k, $v {
         my $option    = TelnetOption($v);
-        my $supported = defined SUPPORTED.index($k);
-        my $preferred = defined @options.index($k);
+        my $supported = defined @supported.index($k);
+        my $preferred = defined @preferred.index($k);
         $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred;
     };
     self.bless: :$host, :$port, :$options;
@@ -96,7 +94,7 @@ method !receive-will(TelnetOption $option) {
     my Net::Telnet::Option $opt = $!options{$option};
     given $opt.them {
         when NO {
-            if $opt.supported && $opt.preferred {
+            if $opt.supported {
                 $opt.them = YES;
                 self!send-negotiation(DO, $option);
             } else {
@@ -173,7 +171,7 @@ method !receive-do(TelnetOption $option) {
     given $opt.us {
         when NO {
             $opt.us = YES;
-            if $opt.supported && $opt.preferred {
+            if $opt.supported {
                 self!send-negotiation(WILL, $option);
                 self!send-subnegotiation($option);
             } else {
@@ -198,7 +196,7 @@ method !receive-do(TelnetOption $option) {
             given $opt.usq {
                 when EMPTY {
                     $opt.us = YES;
-                    self!send-subnegotiation($option) if $opt.supported && $opt.preferred;
+                    self!send-subnegotiation($option) if $opt.supported;
                 }
                 when OPPOSITE {
                     $opt.us = WANTNO;
@@ -269,7 +267,7 @@ Net::Telnet::Client is a library for creating Telnet clients.
 
     use Net::Telnet::Client;
 
-    my Net::Telnet::Client $client .= new: :host<telehack.com>, :options<ECHO SGA>;
+    my Net::Telnet::Client $client .= new: :host<telehack.com>, :supported<ECHO SGA>;
     $client.text.tap(-> $text { $text.print });
     await $client.connect;
     await $client.send("cowsay ayy lmao\r\n");
@@ -303,18 +301,13 @@ C«(Net::Telnet::Chunk::TelnetOption => Net::Telnet::Option)».
 
 Returns the supply to which text received by the client is emitted.
 
-=item B<new>(Str :$host, Int :$port, :@options --> Net::Telnet::Client)
+=item B<new>(Str :$host, Int :$port, :@supported?, :@preferred?,--> Net::Telnet::Client)
 
 Initializes a Telnet client. C<$host> and C<$port> are used by C<.connect> to
-connect to a server. C<@options> is an array of strings representing the
-options the client should support. Currently, the following options are
-supported:
-
-=defn ECHO
-Echo
-
-=defn SGA
-Suppress go-ahead
+connect to a server. C<@supported> is an array of options of which the client
+will allow the server to negotiate with, while C<@preferred> is an array of
+options of which the client I<will> negotiate with the server with. Both are not
+required, but should preferrably be included.
 
 =item B<connect>(--> Promise)
 
