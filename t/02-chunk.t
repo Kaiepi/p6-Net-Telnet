@@ -42,7 +42,6 @@ my $actions = Net::Telnet::Chunk::Actions.new;
     is $match.gist, 'IAC SB NAWS 255 255 IAC SE', 'Can make NAWS subnegotiations human-readable';
     is $match.serialize.decode('latin1'), $msg, 'Can serialize NAWS subnegotiations';
     is $match.Str, $msg, 'Can stringify NAWS subnegotiations';
-    sleep 1;
 }
 
 {
