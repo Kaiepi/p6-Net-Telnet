@@ -11,14 +11,13 @@ proto method gist(--> Str) {
 
 # Overridden by implementations.
 proto method serialize(--> Blob) {
-    Blob.new(
+    Blob.new:
         IAC.ord,
         SB.ord,
         $!option.ord,
-        |{*}.contents.reduce({ ($^b == 0xFF) ?? [|$^a, $^b, $^b] !! [|$^a, $^b] }),
+        |[(), |{*}].reduce({ ($^b == 0xFF) ?? (|$^a, $^b, $^b) !! (|$^a, $^b) }),
         IAC.ord,
         SE.ord
-    )
 }
 
 method Str(--> Str) { self.serialize.decode('latin1') }
