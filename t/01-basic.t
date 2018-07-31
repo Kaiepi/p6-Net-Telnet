@@ -32,10 +32,10 @@ $client.parse('ayy lmao'.encode('latin1'));
 sleep 1;
 
 $client.close;
+sleep 1;
 is $client.closed, True, 'Connection closed state is accurate after the client closes the connection';
 
 await $client.connect;
 $server.close;
 sleep 1;
-
 is $client.closed, True, 'Connection closed state is accurate after the server closes the connection';
