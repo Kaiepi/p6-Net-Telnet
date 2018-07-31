@@ -3,7 +3,6 @@ use Net::Telnet::Chunk;
 use Net::Telnet::Option;
 unit role Net::Telnet::Connection;
 
-has          $.socket;
 has Str      $.host;
 has Int      $.port;
 has Supplier $.text .= new;
@@ -11,11 +10,6 @@ has Supplier $.text .= new;
 has Map $.options;
 has Str @.preferred;
 has Str @.supported;
-
-has Int $.client-width  = 0;
-has Int $.client-height = 0;
-has Int $.server-width  = 0;
-has Int $.server-height = 0;
 
 has Net::Telnet::Chunk::Actions $!actions    .= new;
 has Blob                        $!parser-buf .= new;
@@ -98,17 +92,12 @@ method !parse-negotiation(Net::Telnet::Chunk::Negotiation $negotiation --> Promi
     }
 }
 
-method !parse-subnegotiation(Net::Telnet::Chunk::Subnegotiation $subnegotiation) {
-    given $subnegotiation {
-        when Net::Telnet::Chunk::Subnegotiation::NAWS {
-            $!server-width  = $subnegotiation.width;
-            $!server-height = $subnegotiation.height;
-        }
-    }
-}
+# Overridden by implementations.
+method !parse-subnegotiation(Net::Telnet::Chunk::Subnegotiation $subnegotiation) { }
 
-multi method send(Blob $data --> Promise) { $!socket.write($data) }
-multi method send(Str $data --> Promise)  { $!socket.print($data) }
+# Overridden by implementations.
+multi method send(Blob $data --> Promise) { }
+multi method send(Str $data --> Promise)  { }
 
 method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promise) {
     my Net::Telnet::Chunk::Negotiation $negotiation .= new: :$command, :$option;
@@ -117,25 +106,12 @@ method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promis
 }
 
 method !send-subnegotiation(TelnetOption $option --> Promise) {
-    my Net::Telnet::Chunk::Subnegotiation $subnegotiation;
+    my Net::Telnet::Chunk::Subnegotiation $subnegotiation = self!try-send-subnegotiation($option);
+    return Promise.start({ 0 }) unless defined $subnegotiation;
 
-    given $option {
-        when NAWS {
-            # TODO: detect width/height of terminal from Net::Telnet::Terminal.
-            # Having 0 for the width and height is allowed, that just means the
-            # server decides what the width and height should be on its own.
-            $!client-width  = 0;
-            $!client-height = 0;
-            $subnegotiation = Net::Telnet::Chunk::Subnegotiation::NAWS.new:
-                width  => $!client-width,
-                height => $!client-height;
-        }
-    }
-
-    if defined $subnegotiation {
-        say '[SEND] ', $subnegotiation;
-        self.send: $subnegotiation.serialize
-    } else {
-        Promise.start({ 0 })
-    }
+    say '[SEND] ', $subnegotiation;
+    self.send: $subnegotiation.serialize
 }
+
+# Overridden by implementations.
+method !try-send-subnegotiation(--> Net::Telnet::Chunk::Subnegotiation) { }
