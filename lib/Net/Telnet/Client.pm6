@@ -1,44 +1,14 @@
 use v6.c;
 use Net::Telnet::Connection;
-use Net::Telnet::Constants;
 use Net::Telnet::Option;
-use Net::Telnet::Subnegotiation;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
-has IO::Socket::Async $.socket;
-has Bool              $.closed     = True;
-has Bool              $!negotiated = False;
+has Bool $!negotiated = False;
 
-has Int $.client-width  = 0;
-has Int $.client-height = 0;
-has Int $.server-width  = 0;
-has Int $.server-height = 0;
-
-multi method connect(--> Promise) {
+method connect(--> Promise) {
     IO::Socket::Async.connect($!host, $!port).then(-> $p {
-        $!closed = False;
-
-        my Buf $buf .= new;
-        $!socket = $p.result;
-        $!socket.Supply(:bin, :$buf).act(-> $data {
-            if !$!negotiated && $data ~~ Str {
-                $!negotiated = True;
-                self!negotiate-on-init;
-            }
-            self.parse: $data;
-        }, done => {
-            $buf = Nil;
-            self!on-close;
-        }, quit => {
-            $buf = Nil;
-            self!on-close;
-        });
-
-        # TODO: once getting the file descriptor of IO::Socket::Async sockets is
-        # possible, set SO_OOBINLINE and implement GA support.
-
-        self
-    });
+        self!on-connect: $p.result;
+    })
 }
 
 # We don't want to send any subnegotiations for our supported options until
@@ -48,52 +18,23 @@ multi method connect(--> Promise) {
 method !negotiate-on-init {
     for $!options.values -> $option {
         if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
-            my TelnetCommand $command = $option.on-send-will;
+            my $command = $option.on-send-will;
             await self!send-negotiation: $command, $option.option if defined $command;
         }
         if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
-            my TelnetCommand $command = $option.on-send-do;
+            my $command = $option.on-send-do;
             await self!send-negotiation: $command, $option.option if defined $command;
         }
     }
 }
 
-method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation) {
-    given $subnegotiation.option {
-        when NAWS {
-            $!server-width  = $subnegotiation.width;
-            $!server-height = $subnegotiation.height;
-        }
+method !parse-text(Str $text) {
+    if !$!negotiated {
+        $!negotiated = True;
+        self!negotiate-on-init;
     }
-}
 
-multi method send(Blob $data --> Promise) { $!socket.write: $data }
-multi method send(Str  $data --> Promise) { $!socket.print: $data }
-
-method !try-send-subnegotiation(TelnetOption $option --> Net::Telnet::Subnegotiation) {
-    given $option {
-        when NAWS {
-            # TODO: detect width/height of terminal from Net::Telnet::Terminal.
-            # Having 0 for the width and height is allowed, that just means the
-            # server decides what the width and height should be on its own.
-            $!client-width  = 0;
-            $!client-height = 0;
-            Net::Telnet::Subnegotiation::NAWS.new:
-                width  => $!client-width,
-                height => $!client-height
-        }
-    }
-}
-
-method close(--> Bool) {
-    return False if $!closed;
-    $!socket.close
-}
-
-method !on-close {
-    $!closed      = True;
-    $!parser-buf .= new;
-    $!text.done;
+    $!text.emit: $text;
 }
 
 =begin pod
@@ -141,21 +82,21 @@ Whether or not the connection is currently closed.
 A map of the state of all options the client is aware of. Its shape is
 C«(Net::Telnet::Chunk::TelnetOption => Net::Telnet::Option)».
 
-=item Int B<client-width>
-
-The client's terminal width.
-
-=item Int B<client-height>
-
-The client's terminal height.
-
-=item Int B<server-width>
+=item Int B<peer-width>
 
 The server's terminal width.
 
-=item Int B<server-height>
+=item Int B<peer-height>
 
 The server's terminal height.
+
+=item Int B<host-width>
+
+The client's terminal width.
+
+=item Int B<host-height>
+
+The client's terminal height.
 
 =head1 METHODS
 

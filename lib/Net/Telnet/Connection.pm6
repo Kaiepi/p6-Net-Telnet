@@ -7,18 +7,27 @@ use Net::Telnet::Option;
 use Net::Telnet::Subnegotiation;
 unit role Net::Telnet::Connection;
 
-has Str      $.host;
-has Int      $.port;
-has Supplier $.text .= new;
+has IO::Socket::Async $.socket;
+has Str               $.host;
+has Int               $.port;
+has Bool              $.closed;
+has Supplier          $.text;
 
 has Map $.options;
 has Str @.preferred;
 has Str @.supported;
 
+has Int $.host-width  = 0;
+has Int $.host-height = 0;
+has Int $.peer-width  = 0;
+has Int $.peer-height = 0;
+
 has Net::Telnet::Chunk::Actions $!actions    .= new;
 has Blob                        $!parser-buf .= new;
 
-method text(--> Supply) { $!text.Supply }
+method text(--> Supply) {
+    $!text.Supply
+}
 
 method supported(Str $option --> Bool) {
     defined @!supported.first: * eq $option
@@ -46,6 +55,35 @@ method new(
     self.bless: :$host, :$port, :$options, :@supported, :@preferred;
 }
 
+method !on-connect(IO::Socket::Async $!socket) {
+    $!closed = False;
+    $!text  .= new;
+
+    my Buf $buf .= new;
+    $!socket.Supply(:bin, :$buf).act(-> $data {
+        self.parse: $data;
+    }, done => {
+        $buf = Nil;
+        self!on-close;
+    }, quit => {
+        $buf = Nil;
+        self!on-close;
+    });
+
+    # TODO: once getting the file descriptor of IO::Socket::Async sockets is
+    # possible, set SO_OOBINLINE and implement GA support.
+
+    self
+}
+
+method !on-close {
+    return if $!closed;
+    $!closed      = True;
+    $!parser-buf .= new;
+    $!text.done;
+}
+
+# This is left up to the implementation to decide when to call.
 method !negotiate-on-init {
     for $!options.values -> $option {
         if $option.preferred {
@@ -79,7 +117,7 @@ method parse(Blob $data) {
                 self!parse-subnegotiation: $chunk;
             }
             when Str {
-                $!text.emit($chunk);
+                self!parse-text: $chunk;
             }
         }
     }
@@ -107,7 +145,6 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Promise) {
             given $negotiation.command {
                 when WILL { await self!send-subnegotiation: $negotiation.option if $option.them == YES }
                 when DO   { await self!send-subnegotiation: $negotiation.option if $option.us   == YES }
-                default   { 0 }
             }
         });
     } else {
@@ -115,12 +152,21 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Promise) {
     }
 }
 
-# Overridden by implementations.
-method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation) { }
+method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation) {
+    given $subnegotiation.option {
+        when NAWS {
+            $!peer-width  = $subnegotiation.width;
+            $!peer-height = $subnegotiation.height;
+        }
+    }
+}
 
-# Overridden by implementations.
-multi method send(Blob $data --> Promise) { }
-multi method send(Str $data --> Promise)  { }
+method !parse-text(Str $text) {
+    $!text.emit: $text;
+}
+
+multi method send(Blob $data --> Promise) { $!socket.write: $data }
+multi method send(Str  $data --> Promise) { $!socket.print: $data }
 
 method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promise) {
     my Net::Telnet::Negotiation $negotiation .= new: :$command, :$option;
@@ -129,12 +175,27 @@ method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promis
 }
 
 method !send-subnegotiation(TelnetOption $option --> Promise) {
-    my Net::Telnet::Subnegotiation $subnegotiation = self!try-send-subnegotiation($option);
-    return Promise.start({ 0 }) unless defined $subnegotiation;
+    my Net::Telnet::Subnegotiation $subnegotiation;
 
+    given $option {
+        when NAWS {
+            # TODO: detect width/height of terminal from Net::Telnet::Terminal.
+            # Having 0 for the width and height is allowed, that just means the
+            # server decides what the width and height should be on its own.
+            $!host-width  = 0;
+            $!host-height = 0;
+            $subnegotiation = Net::Telnet::Subnegotiation::NAWS.new:
+                width  => $!host-width,
+                height => $!host-height
+        }
+    }
+
+    return Promise.start({ 0 }) unless defined $subnegotiation;
     say '[SEND] ', $subnegotiation;
     self.send: $subnegotiation.serialize
 }
 
-# Overridden by implementations.
-method !try-send-subnegotiation(--> Net::Telnet::Subnegotiation) { }
+method close(--> Bool) {
+    return False if $!closed;
+    $!socket.close
+}
