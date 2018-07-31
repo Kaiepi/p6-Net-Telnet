@@ -1,6 +1,6 @@
 use v6.c;
-use Net::Telnet::Chunk;
 use Net::Telnet::Client;
+use Net::Telnet::Constants;
 use Net::Telnet::Option;
 use Test;
 

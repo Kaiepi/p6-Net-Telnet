@@ -1,6 +1,10 @@
 use v6.c;
 use Net::Telnet::Chunk;
+use Net::Telnet::Command;
+use Net::Telnet::Constants;
+use Net::Telnet::Negotiation;
 use Net::Telnet::Option;
+use Net::Telnet::Subnegotiation;
 unit role Net::Telnet::Connection;
 
 has Str      $.host;
@@ -47,15 +51,15 @@ method parse(Blob $data) {
 
     for $match.ast -> $chunk {
         given $chunk {
-            when Net::Telnet::Chunk::Command {
+            when Net::Telnet::Command {
                 say '[RECV] ', $chunk;
                 self!parse-command: $chunk;
             }
-            when Net::Telnet::Chunk::Negotiation {
+            when Net::Telnet::Negotiation {
                 say '[RECV] ', $chunk;
                 self!parse-negotiation: $chunk;
             }
-            when Net::Telnet::Chunk::Subnegotiation {
+            when Net::Telnet::Subnegotiation {
                 say '[RECV] ', $chunk;
                 self!parse-subnegotiation: $chunk;
             }
@@ -68,11 +72,11 @@ method parse(Blob $data) {
     $!parser-buf = $match.postmatch.encode('latin1') if $match.postmatch;
 }
 
-method !parse-command(Net::Telnet::Chunk::Command $command) {
+method !parse-command(Net::Telnet::Command $command) {
     # ...
 }
 
-method !parse-negotiation(Net::Telnet::Chunk::Negotiation $negotiation --> Promise) {
+method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Promise) {
     my Net::Telnet::Option $option = $!options{$negotiation.option};
     my TelnetCommand       $command;
 
@@ -93,20 +97,20 @@ method !parse-negotiation(Net::Telnet::Chunk::Negotiation $negotiation --> Promi
 }
 
 # Overridden by implementations.
-method !parse-subnegotiation(Net::Telnet::Chunk::Subnegotiation $subnegotiation) { }
+method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation) { }
 
 # Overridden by implementations.
 multi method send(Blob $data --> Promise) { }
 multi method send(Str $data --> Promise)  { }
 
 method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promise) {
-    my Net::Telnet::Chunk::Negotiation $negotiation .= new: :$command, :$option;
+    my Net::Telnet::Negotiation $negotiation .= new: :$command, :$option;
     say '[SEND] ', $negotiation;
     self.send: $negotiation.serialize
 }
 
 method !send-subnegotiation(TelnetOption $option --> Promise) {
-    my Net::Telnet::Chunk::Subnegotiation $subnegotiation = self!try-send-subnegotiation($option);
+    my Net::Telnet::Subnegotiation $subnegotiation = self!try-send-subnegotiation($option);
     return Promise.start({ 0 }) unless defined $subnegotiation;
 
     say '[SEND] ', $subnegotiation;
@@ -114,4 +118,4 @@ method !send-subnegotiation(TelnetOption $option --> Promise) {
 }
 
 # Overridden by implementations.
-method !try-send-subnegotiation(--> Net::Telnet::Chunk::Subnegotiation) { }
+method !try-send-subnegotiation(--> Net::Telnet::Subnegotiation) { }

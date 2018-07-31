@@ -1,6 +1,7 @@
 use v6.c;
-use Net::Telnet::Chunk;
 use Net::Telnet::Connection;
+use Net::Telnet::Constants;
+use Net::Telnet::Subnegotiation;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
 has IO::Socket::Async $.socket;
@@ -34,9 +35,9 @@ multi method connect(--> Promise) {
     });
 }
 
-method !parse-subnegotiation(Net::Telnet::Chunk::Subnegotiation $subnegotiation) {
-    given $subnegotiation {
-        when Net::Telnet::Chunk::Subnegotiation::NAWS {
+method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation) {
+    given $subnegotiation.option {
+        when NAWS {
             $!server-width  = $subnegotiation.width;
             $!server-height = $subnegotiation.height;
         }
@@ -46,7 +47,7 @@ method !parse-subnegotiation(Net::Telnet::Chunk::Subnegotiation $subnegotiation)
 multi method send(Blob $data --> Promise) { $!socket.write: $data }
 multi method send(Str  $data --> Promise) { $!socket.print: $data }
 
-method !try-send-subnegotiation(TelnetOption $option --> Net::Telnet::Chunk::Subnegotiation) {
+method !try-send-subnegotiation(TelnetOption $option --> Net::Telnet::Subnegotiation) {
     given $option {
         when NAWS {
             # TODO: detect width/height of terminal from Net::Telnet::Terminal.
@@ -54,7 +55,7 @@ method !try-send-subnegotiation(TelnetOption $option --> Net::Telnet::Chunk::Sub
             # server decides what the width and height should be on its own.
             $!client-width  = 0;
             $!client-height = 0;
-            Net::Telnet::Chunk::Subnegotiation::NAWS.new:
+            Net::Telnet::Subnegotiation::NAWS.new:
                 width  => $!client-width,
                 height => $!client-height
         }

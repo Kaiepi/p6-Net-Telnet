@@ -1,5 +1,5 @@
 use v6.c;
-use Net::Telnet::Chunk;
+use Net::Telnet::Constants;
 unit class Net::Telnet::Option;
 
 # See RFC 1143
