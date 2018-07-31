@@ -4,14 +4,16 @@ use Net::Telnet::Client;
 use Net::Telnet::Option;
 use Test;
 
-plan 13;
+plan 15;
 
 my IO::Socket::INET    $server .= listen: '127.0.0.1', 8000;
-my Net::Telnet::Client $client .= new: :host<127.0.0.1>, :8000port, :supported<SGA ECHO>;
+my Net::Telnet::Client $client .= new: :host<127.0.0.1>, :8000port, :supported<SGA ECHO NAWS>;
 
 lives-ok { await $client.connect }, 'Can open new connections';
 is $client.host, '127.0.0.1', 'Can get connection host';
 is $client.port, 8000, 'Can get connection port';
+ok $client.supported('SGA'), 'Can get supported options';
+nok $client.preferred('NAWS'), 'Can get preferred options';
 is $client.closed, False, 'Can get connection closed state';
 cmp-ok $client.options{SGA}, '~~', Net::Telnet::Option, 'Can get connection options';
 is $client.options{SGA}.supported, True, 'Can support options by passing them through .new';

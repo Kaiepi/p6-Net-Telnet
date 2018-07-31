@@ -22,21 +22,19 @@ has Blob                        $!parser-buf .= new;
 
 method text(--> Supply) { $!text.Supply }
 
-method supported(Str $option-name --> Bool) {
-    my TelnetOption $option .= enums{$option-name};
-    so @!supported.first({ $_ == $option })
+method supported(Str $option --> Bool) {
+    defined @!supported.first: * eq $option
 }
 
-method preferred(Str $option-name --> Bool) {
-    my TelnetOption $option .= enums{$option-name};
-    so @!preferred.first({ $_ == $option })
+method preferred(Str $option --> Bool) {
+    defined @!preferred.first: * eq $option
 }
 
 method new(
     Str :$host,
     Int :$port = 23,
-    :@preferred,
-    :@supported
+    :@preferred = [],
+    :@supported = []
 ) {
     my Map $options .= new: TelnetOption.enums.kv.map: -> $k, $v {
         my $option    = TelnetOption($v);

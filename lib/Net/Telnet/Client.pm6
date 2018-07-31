@@ -2,7 +2,7 @@ use v6.c;
 use Net::Telnet::Connection;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
-has Bool              $.closed = True;
+has Bool $.closed = True;
 
 multi method connect(--> Promise) {
     IO::Socket::Async.connect($!host, $!port).then(-> $p {
