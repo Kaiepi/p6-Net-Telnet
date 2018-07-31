@@ -10,8 +10,8 @@ unit role Net::Telnet::Connection;
 has IO::Socket::Async $.socket;
 has Str               $.host;
 has Int               $.port;
-has Bool              $.closed;
-has Supplier          $.text;
+has Bool              $.closed = False;
+has Supplier          $.text  .= new;
 
 has Map $.options;
 has Str @.preferred;
@@ -41,7 +41,8 @@ method new(
     Str :$host,
     Int :$port = 23,
     :$preferred = [],
-    :$supported = []
+    :$supported = [],
+    *%args
 ) {
     my Str @preferred = |$preferred;
     my Str @supported = |$supported;
@@ -52,13 +53,10 @@ method new(
         $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred;
     };
 
-    self.bless: :$host, :$port, :$options, :@supported, :@preferred;
+    self.bless: :$host, :$port, :$options, :@supported, :@preferred, |%args;
 }
 
 method !on-connect(IO::Socket::Async $!socket) {
-    $!closed = False;
-    $!text  .= new;
-
     my Buf $buf .= new;
     $!socket.Supply(:bin, :$buf).act(-> $data {
         self.parse: $data;

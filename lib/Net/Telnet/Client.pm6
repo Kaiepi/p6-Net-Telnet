@@ -61,40 +61,40 @@ Net::Telnet::Client is a library for creating Telnet clients.
 
 =head1 ATTRIBUTES
 
-=item Str B<host>
+=item IO::Socket::Async B<$.socket>
+
+The client's socket.
+
+=item Str B<$.host>
 
 The host with which the client will connect.
 
-=item Int B<port>
+=item Int B<$.port>
 
 The port with which the client will connect.
 
-=item IO::Socket::Async B<socket>
-
-The connection object.
-
-=item Bool B<closed>
+=item Bool B<$.closed>
 
 Whether or not the connection is currently closed.
 
-=item Map B<options>
+=item Map B<$.options>
 
 A map of the state of all options the client is aware of. Its shape is
 C«(Net::Telnet::Chunk::TelnetOption => Net::Telnet::Option)».
 
-=item Int B<peer-width>
+=item Int B<$.peer-width>
 
 The server's terminal width.
 
-=item Int B<peer-height>
+=item Int B<$.peer-height>
 
 The server's terminal height.
 
-=item Int B<host-width>
+=item Int B<$.host-width>
 
 The client's terminal width.
 
-=item Int B<host-height>
+=item Int B<$.host-height>
 
 The client's terminal height.
 

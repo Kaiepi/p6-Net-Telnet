@@ -10,6 +10,7 @@ Net::Telnet - Telnet library for clients and servers
 =head1 SYNOPSIS
 
     use Net::Telnet::Client;
+    use Net::Telnet::Server;
 
     my Net::Telnet::Client $client .= new:
         :host<telehack.com>,
@@ -18,10 +19,31 @@ Net::Telnet - Telnet library for clients and servers
     $client.text.tap({ .print });
     await $client.connect;
     await $client.send("cowsay ayy lmao\r\n");
+    $client.close;
 
-    use Net::Telnet::Server;
+    my Net::Telnet::Server $server .= new:
+        :host<localhost>,
+        :preferred<SGA ECHO>,
+        :supported<NAWS>;
+    $server.listen;
 
-    # TODO
+    react {
+        whenever $server.connections -> $conn {
+            $conn.text.tap(-> $text {
+                say "$conn.host:$conn.port sent '$text'";
+                $conn.close;
+            }, done => {
+                # Connection was closed; clean up if necessary.
+            });
+
+            LAST {
+                # Server was closed; clean up if necessary.
+            }
+        }
+        whenever signal(SIGINT) {
+            $server.close;
+        }
+    }
 
 =head1 DESCRIPTION
 
