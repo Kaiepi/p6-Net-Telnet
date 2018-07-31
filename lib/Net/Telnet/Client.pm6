@@ -1,11 +1,13 @@
 use v6.c;
 use Net::Telnet::Connection;
 use Net::Telnet::Constants;
+use Net::Telnet::Option;
 use Net::Telnet::Subnegotiation;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
 has IO::Socket::Async $.socket;
-has Bool              $.closed = True;
+has Bool              $.closed     = True;
+has Bool              $!negotiated = False;
 
 has Int $.client-width  = 0;
 has Int $.client-height = 0;
@@ -19,6 +21,10 @@ multi method connect(--> Promise) {
         my Buf $buf .= new;
         $!socket = $p.result;
         $!socket.Supply(:bin, :$buf).act(-> $data {
+            if !$!negotiated && $data ~~ Str {
+                $!negotiated = True;
+                self!negotiate-on-init;
+            }
             self.parse: $data;
         }, done => {
             $buf = Nil;
@@ -31,19 +37,23 @@ multi method connect(--> Promise) {
         # TODO: once getting the file descriptor of IO::Socket::Async sockets is
         # possible, set SO_OOBINLINE and implement GA support.
 
-        self!negotiate-on-init;
-
         self
     });
 }
 
-# We don't want to send any subnegotiations for our supported options unless
-# the server specifically requests them. Just send those for preferred options.
+# We don't want to send any subnegotiations for our supported options until
+# after the server has requested which options should be enabled. Only then
+# should we send our negotiations, and only if the server *didn't* tell us to
+# already.
 method !negotiate-on-init {
     for $!options.values -> $option {
-        if $option.preferred {
+        if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
             my TelnetCommand $command = $option.on-send-will;
-            self!send-negotiation: $command, $option.option if defined $command;
+            await self!send-negotiation: $command, $option.option if defined $command;
+        }
+        if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
+            my TelnetCommand $command = $option.on-send-do;
+            await self!send-negotiation: $command, $option.option if defined $command;
         }
     }
 }
@@ -100,8 +110,11 @@ Net::Telnet::Client is a library for creating Telnet clients.
 
     use Net::Telnet::Client;
 
-    my Net::Telnet::Client $client .= new: :host<telehack.com>, :supported<ECHO SGA NAWS>;
-    $client.text.tap(-> $text { $text.print });
+    my Net::Telnet::Client $client .= new:
+        :host<telehack.com>,
+        :preferred<NAWS>,
+        :supported<ECHO SGA>;
+    $client.text.tap({ .print });
     await $client.connect;
     await $client.send("cowsay ayy lmao\r\n");
 

@@ -10,7 +10,10 @@ SYNOPSIS
 
     use Net::Telnet::Client;
 
-    my Net::Telnet::Client $client .= new: :host<telehack.com>, :options<ECHO SGA>;
+    my Net::Telnet::Client $client .= new:
+        :host<telehack.com>,
+        :preferred<NAWS>,
+        :supported<SGA ECHO>;
     $client.text.tap({ .print });
     await $client.connect;
     await $client.send("cowsay ayy lmao\r\n");

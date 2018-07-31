@@ -31,10 +31,12 @@ method preferred(Str $option --> Bool) {
 method new(
     Str :$host,
     Int :$port = 23,
-    :@preferred = [],
-    :@supported = []
+    :$preferred = [],
+    :$supported = []
 ) {
-    my Map $options .= new: TelnetOption.enums.kv.map: -> $k, $v {
+    my Str @preferred = |$preferred;
+    my Str @supported = |$supported;
+    my Map $options  .= new: TelnetOption.enums.kv.map: -> $k, $v {
         my $option    = TelnetOption($v);
         my $supported = defined @supported.index($k);
         my $preferred = defined @preferred.index($k);
@@ -44,7 +46,6 @@ method new(
     self.bless: :$host, :$port, :$options, :@supported, :@preferred;
 }
 
-# TODO: when options support becomes thread-safe, map over options with .hyper.
 method !negotiate-on-init {
     for $!options.values -> $option {
         if $option.preferred {
