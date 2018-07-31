@@ -102,11 +102,15 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Promise) {
     }
 
     if defined $command {
-        self!send-negotiation($command, $negotiation.option).then(-> $p {
-            [$p.result, await self!send-subnegotiation: $negotiation.option]
+        self!send-negotiation($command, $negotiation.option).then({
+            given $negotiation.command {
+                when WILL { await self!send-subnegotiation: $negotiation.option if $option.them == YES }
+                when DO   { await self!send-subnegotiation: $negotiation.option if $option.us   == YES }
+                default   { 0 }
+            }
         });
     } else {
-        Promise.start({ [0, 0] })
+        Promise.start({ 0 })
     }
 }
 

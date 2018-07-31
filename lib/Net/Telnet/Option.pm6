@@ -46,8 +46,9 @@ method on-receive-will(--> TelnetCommand) {
                     $!them = YES;
                 }
                 when OPPOSITE {
-                    $!them  = WANTNO;
-                    $!themq = EMPTY;
+                    $!them   = WANTNO;
+                    $!themq  = EMPTY;
+                    $to-send = DONT;
                 }
             }
         }
@@ -100,8 +101,12 @@ method on-receive-do(--> TelnetCommand) {
 
     given $!us {
         when NO {
-            $!us     = YES;
-            $to-send = $!supported ?? WILL !! WONT;
+            if $!preferred {
+                $!us     = YES;
+                $to-send = WILL;
+            } else {
+                $to-send = WONT;
+            }
         }
         when YES {
             # Already enabled.
@@ -120,8 +125,7 @@ method on-receive-do(--> TelnetCommand) {
         when WANTYES {
             given $!usq {
                 when EMPTY {
-                    $!us     = YES;
-                    $to-send = WILL if $!supported;
+                    $!us = YES;
                 }
                 when OPPOSITE {
                     $!us     = WANTNO;
@@ -179,8 +183,12 @@ method on-send-will(--> TelnetCommand) {
 
     given $!us {
         when NO {
-            $!us     = WANTYES;
-            $to-send = WILL;
+            if $!preferred {
+                $!us     = WANTYES;
+                $to-send = WILL;
+            } else {
+                $to-send = WONT;
+            }
         }
         when YES {
             # Already enabled.
@@ -251,8 +259,12 @@ method on-send-do(--> TelnetCommand) {
 
     given $!them {
         when NO {
-            $!them   = WANTYES;
-            $to-send = DO;
+            if $!supported {
+                $!them   = WANTYES;
+                $to-send = DO;
+            } else {
+                $to-send = DONT;
+            }
         }
         when YES {
             # Already enabled.
