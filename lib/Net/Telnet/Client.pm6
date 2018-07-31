@@ -31,8 +31,21 @@ multi method connect(--> Promise) {
         # TODO: once getting the file descriptor of IO::Socket::Async sockets is
         # possible, set SO_OOBINLINE and implement GA support.
 
+        self!negotiate-on-init;
+
         self
     });
+}
+
+# We don't want to send any subnegotiations for our supported options unless
+# the server specifically requests them. Just send those for preferred options.
+method !negotiate-on-init {
+    for $!options.values -> $option {
+        if $option.preferred {
+            my TelnetCommand $command = $option.on-send-will;
+            self!send-negotiation: $command, $option.option if defined $command;
+        }
+    }
 }
 
 method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation) {

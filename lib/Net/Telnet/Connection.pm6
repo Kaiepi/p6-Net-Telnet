@@ -44,6 +44,20 @@ method new(
     self.bless: :$host, :$port, :$options, :@supported, :@preferred;
 }
 
+# TODO: when options support becomes thread-safe, map over options with .hyper.
+method !negotiate-on-init {
+    for $!options.values -> $option {
+        if $option.preferred {
+            my TelnetCommand $command = $option.on-send-will;
+            await self!send-negotiation: $command, $option.option if defined $command;
+        }
+        if $option.supported {
+            my TelnetCommand $command = $option.on-send-do;
+            await self!send-negotiation: $command, $option.option if defined $command;
+        }
+    }
+}
+
 method parse(Blob $data) {
     my Blob                        $buf    = $!parser-buf.elems ?? $!parser-buf.splice.append($data) !! $data;
     my Str                         $msg    = $buf.decode('latin1');

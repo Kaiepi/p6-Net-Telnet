@@ -173,3 +173,147 @@ method on-receive-dont(--> TelnetCommand) {
 
     $to-send
 }
+
+method on-send-will(--> TelnetCommand) {
+    my TelnetCommand $to-send;
+
+    given $!us {
+        when NO {
+            $!us     = WANTYES;
+            $to-send = WILL;
+        }
+        when YES {
+            # Already enabled.
+        }
+        when WANTNO {
+            given $!usq {
+                when EMPTY {
+                    $!usq = OPPOSITE;
+                }
+                when OPPOSITE {
+                    # Already queued an enable request.
+                }
+            }
+        }
+        when WANTYES {
+            given $!usq {
+                when EMPTY {
+                    # Already negotiating for enable.
+                }
+                when OPPOSITE {
+                    $!usq = EMPTY;
+                }
+            }
+        }
+    }
+
+    $to-send
+}
+
+method on-send-wont(--> TelnetCommand) {
+    my TelnetCommand $to-send;
+
+    given $!us {
+        when NO {
+            # Already disabled.
+        }
+        when YES {
+            $!us     = WANTNO;
+            $to-send = WONT;
+        }
+        when WANTNO {
+            given $!usq {
+                when EMPTY {
+                    # Already negotiating for disable.
+                }
+                when OPPOSITE {
+                    $!usq = EMPTY;
+                }
+            }
+        }
+        when WANTYES {
+            given $!usq {
+                when EMPTY {
+                    $!usq = OPPOSITE;
+                }
+                when OPPOSITE {
+                    # Already queued a disable request.
+                }
+            }
+        }
+    }
+
+    $to-send
+}
+
+method on-send-do(--> TelnetCommand) {
+    my TelnetCommand $to-send;
+
+    given $!them {
+        when NO {
+            $!them   = WANTYES;
+            $to-send = DO;
+        }
+        when YES {
+            # Already enabled.
+        }
+        when WANTNO {
+            given $!themq {
+                when EMPTY {
+                    $!themq = OPPOSITE;
+                }
+                when OPPOSITE {
+                    # Already queued an enable request.
+                }
+            }
+        }
+        when WANTYES {
+            given $!themq {
+                when EMPTY {
+                    # Already negotiating for enable.
+                }
+                when OPPOSITE {
+                    $!themq = EMPTY;
+                }
+            }
+        }
+    }
+
+    $to-send
+}
+
+method on-send-dont(--> TelnetCommand) {
+    my TelnetCommand $to-send;
+
+    given $!them {
+        when NO {
+            # Already disabled.
+        }
+        when YES {
+            $!them   = WANTNO;
+            $to-send = DONT;
+        }
+        when WANTNO {
+            given $!themq {
+                when EMPTY {
+                    # Already negotiating for disable.
+                }
+                when OPPOSITE {
+                    $!themq = EMPTY;
+                }
+            }
+        }
+        when WANTYES {
+            given $!themq {
+                when EMPTY {
+                    $!themq = OPPOSITE;
+                }
+                when OPPOSITE {
+                    # Already queued on disable request.
+                }
+            }
+        }
+    }
+
+    $to-send
+}
