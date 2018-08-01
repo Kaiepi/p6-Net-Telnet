@@ -5,6 +5,7 @@ use Net::Telnet::Constants;
 use Net::Telnet::Negotiation;
 use Net::Telnet::Option;
 use Net::Telnet::Subnegotiation;
+use Net::Telnet::Terminal;
 unit role Net::Telnet::Connection;
 
 has IO::Socket::Async $.socket;
@@ -21,6 +22,7 @@ has Int $.host-width  = 0;
 has Int $.host-height = 0;
 has Int $.peer-width  = 0;
 has Int $.peer-height = 0;
+has Tap $!terminal;
 
 has Net::Telnet::Chunk::Actions $!actions    .= new;
 has Blob                        $!parser-buf .= new;
@@ -40,9 +42,9 @@ method preferred(Str $option --> Bool) {
 method new(
     Str :$host,
     Int :$port = 23,
-    :$preferred = [],
-    :$supported = [],
-    *%args
+        :$preferred = [],
+        :$supported = [],
+        *%args
 ) {
     my Str @preferred = |$preferred;
     my Str @supported = |$supported;
@@ -69,7 +71,15 @@ method !on-connect(IO::Socket::Async $!socket) {
     });
 
     # TODO: once getting the file descriptor of IO::Socket::Async sockets is
-    # possible, set SO_OOBINLINE and implement GA support.
+    # possible, set SO_OOBINLINE and implement DM support.
+
+    $!host-width  = Net::Telnet::Terminal.width;
+    $!host-height = Net::Telnet::Terminal.height;
+    $!terminal    = signal(SIGWINCH).tap({
+        $!host-width  = Net::Telnet::Terminal.width;
+        $!host-height = Net::Telnet::Terminal.height;
+        self!send-subnegotiation(NAWS) if $!options{NAWS} && $!options{NAWS}.us == YES;
+    });
 
     self
 }
@@ -79,6 +89,7 @@ method !on-close {
     $!closed      = True;
     $!parser-buf .= new;
     $!text.done;
+    $!terminal.close;
 }
 
 # This is left up to the implementation to decide when to call.
@@ -177,11 +188,6 @@ method !send-subnegotiation(TelnetOption $option --> Promise) {
 
     given $option {
         when NAWS {
-            # TODO: detect width/height of terminal from Net::Telnet::Terminal.
-            # Having 0 for the width and height is allowed, that just means the
-            # server decides what the width and height should be on its own.
-            $!host-width  = 0;
-            $!host-height = 0;
             $subnegotiation = Net::Telnet::Subnegotiation::NAWS.new:
                 width  => $!host-width,
                 height => $!host-height
