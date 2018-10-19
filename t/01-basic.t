@@ -63,7 +63,7 @@ my Int $port = 8000;
     ok $client.supported('SGA'), 'Can get client supported options';
     is $client.closed, False, 'Can get client closed state';
     await $p1;
-    sleep 1;
+    sleep 1; # FIXME: shouldn't need a sleep call here
     is $client.closed, True, 'Client closed state is accurate after the client closes the connection';
 
     {

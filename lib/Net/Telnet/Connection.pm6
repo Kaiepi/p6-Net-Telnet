@@ -138,7 +138,7 @@ method !parse-command(Net::Telnet::Command $command) {
     # ...
 }
 
-method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Promise) {
+method !parse-negotiation(Net::Telnet::Negotiation $negotiation) {
     my Net::Telnet::Option $option = $!options{$negotiation.option};
     my TelnetCommand       $command;
 
@@ -150,14 +150,11 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Promise) {
     }
 
     if defined $command {
-        self!send-negotiation($command, $negotiation.option).then({
-            given $negotiation.command {
-                when WILL { await self!send-subnegotiation: $negotiation.option if $option.them == YES }
-                when DO   { await self!send-subnegotiation: $negotiation.option if $option.us   == YES }
-            }
-        });
-    } else {
-        Promise.start({ 0 })
+        await self!send-negotiation($command, $negotiation.option);
+        given $negotiation.command {
+            when WILL { await self!send-subnegotiation: $negotiation.option if $option.them == YES }
+            when DO   { await self!send-subnegotiation: $negotiation.option if $option.us   == YES }
+        }
     }
 }
 
