@@ -16,14 +16,16 @@ method connect(--> Promise) {
 # should we send our negotiations, and only if the server *didn't* tell us to
 # already.
 method !negotiate-on-init {
-    for $!options.values -> $option {
-        if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
-            my $command = $option.on-send-will;
-            await self!send-negotiation: $command, $option.option if defined $command;
-        }
-        if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
-            my $command = $option.on-send-do;
-            await self!send-negotiation: $command, $option.option if defined $command;
+    $!options-mux.protect: {
+        for $!options.values -> $option {
+            if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
+                my $command = $option.on-send-will;
+                await self!send-negotiation: $command, $option.option if defined $command;
+            }
+            if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
+                my $command = $option.on-send-do;
+                await self!send-negotiation: $command, $option.option if defined $command;
+            }
         }
     }
 }

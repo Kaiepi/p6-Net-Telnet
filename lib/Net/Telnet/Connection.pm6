@@ -14,9 +14,10 @@ has Int               $.port;
 has Bool              $.closed = False;
 has Supplier          $.text  .= new;
 
-has Map $.options;
-has Str @.preferred;
-has Str @.supported;
+has Lock::Async $!options-mux .= new;
+has Map         $.options;
+has Str         @.preferred;
+has Str         @.supported;
 
 has Int $.host-width  = 0;
 has Int $.host-height = 0;
@@ -60,7 +61,7 @@ method new(
 
 method !on-connect(IO::Socket::Async $!socket) {
     my Buf $buf .= new;
-    $!socket.Supply(:bin, :$buf).act(-> $data {
+    $!socket.Supply(:bin, :$buf).tap(-> $data {
         self.parse: $data;
     }, done => {
         $buf = Nil;
@@ -94,14 +95,16 @@ method !on-close {
 
 # This is left up to the implementation to decide when to call.
 method !negotiate-on-init {
-    for $!options.values -> $option {
-        if $option.preferred {
-            my TelnetCommand $command = $option.on-send-will;
-            await self!send-negotiation: $command, $option.option if defined $command;
-        }
-        if $option.supported {
-            my TelnetCommand $command = $option.on-send-do;
-            await self!send-negotiation: $command, $option.option if defined $command;
+    $!options-mux.protect: {
+        for $!options.values -> $option {
+            if $option.preferred {
+                my TelnetCommand $command = $option.on-send-will;
+                await self!send-negotiation: $command, $option.option if defined $command;
+            }
+            if $option.supported {
+                my TelnetCommand $command = $option.on-send-do;
+                await self!send-negotiation: $command, $option.option if defined $command;
+            }
         }
     }
 }
@@ -139,21 +142,23 @@ method !parse-command(Net::Telnet::Command $command) {
 }
 
 method !parse-negotiation(Net::Telnet::Negotiation $negotiation) {
-    my Net::Telnet::Option $option = $!options{$negotiation.option};
-    my TelnetCommand       $command;
+    $!options-mux.protect: {
+        my Net::Telnet::Option $option = $!options{$negotiation.option};
+        my TelnetCommand       $command;
 
-    given $negotiation.command {
-        when DO   { $command = $option.on-receive-do   }
-        when DONT { $command = $option.on-receive-dont }
-        when WILL { $command = $option.on-receive-will }
-        when WONT { $command = $option.on-receive-wont }
-    }
-
-    if defined $command {
-        await self!send-negotiation($command, $negotiation.option);
         given $negotiation.command {
-            when WILL { await self!send-subnegotiation: $negotiation.option if $option.them == YES }
-            when DO   { await self!send-subnegotiation: $negotiation.option if $option.us   == YES }
+            when DO   { $command = $option.on-receive-do   }
+            when DONT { $command = $option.on-receive-dont }
+            when WILL { $command = $option.on-receive-will }
+            when WONT { $command = $option.on-receive-wont }
+        }
+
+        if defined $command {
+            await self!send-negotiation($command, $negotiation.option);
+            given $negotiation.command {
+                when WILL { await self!send-subnegotiation: $negotiation.option if $option.them == YES }
+                when DO   { await self!send-subnegotiation: $negotiation.option if $option.us   == YES }
+            }
         }
     }
 }
