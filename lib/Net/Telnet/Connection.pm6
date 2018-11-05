@@ -60,14 +60,11 @@ method new(
 }
 
 method !on-connect(IO::Socket::Async $!socket) {
-    my Buf $buf .= new;
-    $!socket.Supply(:bin, :$buf).tap(-> $data {
+    $!socket.Supply(:bin).tap(-> $data {
         self.parse: $data;
     }, done => {
-        $buf = Nil;
         self!on-close;
     }, quit => {
-        $buf = Nil;
         self!on-close;
     });
 
