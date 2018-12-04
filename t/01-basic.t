@@ -5,7 +5,7 @@ use Net::Telnet::Option;
 use Net::Telnet::Server;
 use Test;
 
-plan 25;
+plan 23;
 
 my Str $host = '127.0.0.1';
 my Int $port = 8000;
@@ -21,7 +21,7 @@ my Int $port = 8000;
         :$port,
         :preferred<SGA>,
         :supported<NAWS>;
-    my Promise $p1 .= new;
+	my Promise $p .= new;
 
     $client.text.tap(-> $text {
         is $text, 'ayy lmao', 'Can emit text messages received by the client';
@@ -44,7 +44,7 @@ my Int $port = 8000;
                 is $option.us, YES, 'Connection SGA local option is enabled';
             }
 
-            $p1.keep: 1;
+            $p.keep;
         });
 
         is $connection.id, 0, 'First connection received has an ID of 0';
@@ -52,7 +52,6 @@ my Int $port = 8000;
         isnt $connection.port, $server.host, 'Connections are received on a different port from the server';
         ok $connection.preferred('SGA'), 'Can get server preferred options';
         ok $connection.supported('NAWS'), 'Can get server supported options';
-        is $connection.closed, False, 'Received connection is not closed yet';
         await $connection.send: 'ayy lmao';
     });
 
@@ -61,9 +60,7 @@ my Int $port = 8000;
     is $client.port, 8000, 'Can get client port';
     ok $client.preferred('NAWS'), 'Can get client preferred options';
     ok $client.supported('SGA'), 'Can get client supported options';
-    is $client.closed, False, 'Can get client closed state';
-    await $p1;
-    sleep 1; # FIXME: shouldn't need a sleep call here
+    await $p;
     is $client.closed, True, 'Client closed state is accurate after the client closes the connection';
 
     {
@@ -92,14 +89,14 @@ my Int $port = 8000;
     my Promise $p2 .= new;
 
     $client.text.tap(done => {
-        $p1.keep: 1;
+        $p1.keep;
     });
 
     $server.listen.tap(-> $connection {
         $connection.close;
         await $p1;
         is $connection.closed, True, 'Connection closed state is accurate after the server closes the connection';
-        $p2.keep: 1;
+        $p2.keep;
     });
 
     await $client.connect;

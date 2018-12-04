@@ -11,8 +11,8 @@ unit role Net::Telnet::Connection;
 has IO::Socket::Async $.socket;
 has Str               $.host;
 has Int               $.port;
-has Bool              $.closed = False;
-has Supplier          $.text  .= new;
+has Promise           $!closed .= new;
+has Supplier          $.text   .= new;
 
 has Lock::Async $!options-mux .= new;
 has Map         $.options;
@@ -27,6 +27,10 @@ has Tap $!terminal;
 
 has Net::Telnet::Chunk::Actions $!actions    .= new;
 has Blob                        $!parser-buf .= new;
+
+method closed(--> Bool) {
+    $!closed.status ~~ Kept
+}
 
 method text(--> Supply) {
     $!text.Supply
@@ -83,8 +87,7 @@ method !on-connect(IO::Socket::Async $!socket) {
 }
 
 method !on-close {
-    return if $!closed;
-    $!closed      = True;
+    $!closed.keep;
     $!parser-buf .= new;
     $!text.done;
     $!terminal.close;

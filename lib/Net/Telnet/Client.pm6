@@ -75,10 +75,6 @@ The host with which the client will connect.
 
 The port with which the client will connect.
 
-=item Bool B<$.closed>
-
-Whether or not the connection is currently closed.
-
 =item Map B<$.options>
 
 A map of the state of all options the client is aware of. Its shape is
@@ -101,6 +97,10 @@ The client's terminal width.
 The client's terminal height.
 
 =head1 METHODS
+
+=item B<closed>(--> Bool)
+
+Whether or not the connection is currently closed.
 
 =item B<text>(--> Supply)
 
