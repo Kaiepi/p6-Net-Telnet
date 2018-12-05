@@ -37,11 +37,11 @@ method text(--> Supply) {
 }
 
 method supported(Str $option --> Bool) {
-    defined @!supported.first: * eq $option
+    @!supported.contains: $option
 }
 
 method preferred(Str $option --> Bool) {
-    defined @!preferred.first: * eq $option
+    @!preferred.contains: $option
 }
 
 method new(
@@ -54,9 +54,9 @@ method new(
     my Str @preferred = |$preferred;
     my Str @supported = |$supported;
     my Map $options  .= new: TelnetOption.enums.kv.map: -> $k, $v {
-        my $option    = TelnetOption($v);
-        my $supported = defined @supported.index($k);
-        my $preferred = defined @preferred.index($k);
+        my TelnetOption $option    = TelnetOption($v);
+        my Bool         $supported = @supported.contains: $k;
+        my Bool         $preferred = @preferred.contains: $k;
         $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred;
     };
 
