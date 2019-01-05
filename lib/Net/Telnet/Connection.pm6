@@ -1,4 +1,5 @@
 use v6.c;
+use NativeCall;
 use Net::Telnet::Chunk;
 use Net::Telnet::Command;
 use Net::Telnet::Constants;
@@ -7,6 +8,17 @@ use Net::Telnet::Option;
 use Net::Telnet::Subnegotiation;
 use Net::Telnet::Terminal;
 unit role Net::Telnet::Connection;
+
+my constant SO_OOBINLINE = do given $*VM.osname {
+    when 'linux' { 0x000A }
+    default      { 0x0100 }
+};
+my constant SOL_SOCKET   = do given $*VM.osname {
+    when 'linux' { 0x0001 }
+    default      { 0xFFFF }
+};
+
+sub setsockopt(int32, int32, int32, Pointer[void], uint32 --> int32) is native {*}
 
 has IO::Socket::Async $.socket;
 has Str               $.host;
@@ -72,8 +84,11 @@ method !on-connect(IO::Socket::Async $!socket) {
         self!on-close;
     });
 
-    # TODO: once getting the file descriptor of IO::Socket::Async sockets is
-    # possible, set SO_OOBINLINE and implement DM support.
+    if $*VM.name eq 'moar' && $*VM.version >= v2018.12 {
+        my Int           $fd     = $!socket.native-descriptor;
+        my Pointer[void] $optval = nativecast(Pointer[void], CArray[int32].new: 1);
+        setsockopt($fd, SOL_SOCKET, SO_OOBINLINE, $optval, nativesizeof(int32));
+    }
 
     $!host-width  = Net::Telnet::Terminal.width;
     $!host-height = Net::Telnet::Terminal.height;
