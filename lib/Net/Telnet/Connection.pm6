@@ -23,8 +23,8 @@ sub setsockopt(int32, int32, int32, Pointer[void], uint32 --> int32) is native {
 has IO::Socket::Async $.socket;
 has Str               $.host;
 has Int               $.port;
-has Promise           $!closed .= new;
-has Supplier          $.text   .= new;
+has Promise           $.close-promise .= new;
+has Supplier          $.text          .= new;
 
 has Lock::Async $!options-mux .= new;
 has Map         $.options;
@@ -37,11 +37,12 @@ has Int $.peer-width  = 0;
 has Int $.peer-height = 0;
 has Tap $!terminal;
 
-has Net::Telnet::Chunk::Actions $!actions    .= new;
-has Blob                        $!parser-buf .= new;
+has Net::Telnet::Chunk::Actions $!actions        .= new;
+has Int                         $!failed-matches  = 0;
+has Blob                        $!parser-buf     .= new;
 
 method closed(--> Bool) {
-    $!closed.status ~~ Kept
+    $!close-promise.status ~~ Kept
 }
 
 method text(--> Supply) {
@@ -102,7 +103,7 @@ method !on-connect(IO::Socket::Async $!socket) {
 }
 
 method !on-close {
-    $!closed.keep;
+    $!close-promise.keep;
     $!parser-buf .= new;
     $!text.done;
     $!terminal.close;
@@ -128,6 +129,13 @@ method parse(Blob $data) {
     my Blob                        $buf    = $!parser-buf.elems ?? $!parser-buf.splice.append($data) !! $data;
     my Str                         $msg    = $buf.decode('latin1');
     my Net::Telnet::Chunk::Grammar $match .= subparse($msg, :$!actions);
+
+    if $match.ast ~~ Nil {
+        self.close if ++$!failed-matches >= 3;
+        return;
+    } else {
+        $!failed-matches = 0 if $!failed-matches;
+    }
 
     for $match.ast -> $chunk {
         given $chunk {
@@ -217,6 +225,6 @@ method !send-subnegotiation(TelnetOption $option --> Promise) {
 }
 
 method close(--> Bool) {
-    return False if $!closed;
+    return False if self.closed;
     $!socket.close
 }

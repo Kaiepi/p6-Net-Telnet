@@ -5,7 +5,7 @@ use Net::Telnet::Option;
 use Net::Telnet::Server;
 use Test;
 
-plan 23;
+plan 24;
 
 my Str $host = '127.0.0.1';
 my Int $port = 8000;
@@ -103,5 +103,23 @@ my Int $port = 8000;
     await $p2;
     is $client.closed, True, 'Client closed state is accurate after the server closes the connection';
 
+    $server.close;
+}
+
+{
+    my Net::Telnet::Client $client .= new:
+        :$host,
+        :$port;
+    my Net::Telnet::Server $server .= new:
+        :$host,
+        :$port;
+
+    $server.listen.tap(-> $connection {
+        await $connection.send: "\x[FF]\x[FA]\x[FF]\x[F0]" for 0..^3;
+    });
+
+    await $client.connect;
+    await $client.close-promise;
+    ok $client.closed, 'Connection gets closed after 3 messages breaking protocol in a row';
     $server.close;
 }

@@ -75,6 +75,10 @@ The host with which the client will connect.
 
 The port with which the client will connect.
 
+=item Promise B<$.close-promise>
+
+A promise that is kept once the connection is closed.
+
 =item Map B<$.options>
 
 A map of the state of all options the client is aware of. Its shape is
