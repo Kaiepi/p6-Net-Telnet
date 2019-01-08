@@ -21,7 +21,6 @@ my Int $port = 8000;
         :$port,
         :preferred<SGA>,
         :supported<NAWS>;
-	my Promise $p .= new;
 
     $client.text.tap(-> $text {
         is $text, 'ayy lmao', 'Can emit text messages received by the client';
@@ -43,8 +42,6 @@ my Int $port = 8000;
                 ok defined($option), 'Connection SGA option exists';
                 is $option.us, YES, 'Connection SGA local option is enabled';
             }
-
-            $p.keep;
         });
 
         is $connection.id, 0, 'First connection received has an ID of 0';
@@ -60,7 +57,7 @@ my Int $port = 8000;
     is $client.port, 8000, 'Can get client port';
     ok $client.preferred('NAWS'), 'Can get client preferred options';
     ok $client.supported('SGA'), 'Can get client supported options';
-    await $p;
+	await $client.close-promise;
     is $client.closed, True, 'Client closed state is accurate after the client closes the connection';
 
     {
@@ -115,7 +112,7 @@ my Int $port = 8000;
         :$port;
 
     $server.listen.tap(-> $connection {
-        await $connection.send: "\x[FF]\x[FA]\x[FF]\x[F0]" for 0..^3;
+        await $connection.send: "\x[FF]\x[FA]\x[FF]\x[F0]" for 0..3;
     });
 
     await $client.connect;
