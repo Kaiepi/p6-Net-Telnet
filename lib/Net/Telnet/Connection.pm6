@@ -85,7 +85,7 @@ method !on-connect(IO::Socket::Async $!socket) {
         self!on-close;
     });
 
-    if $*VM.name eq 'moar' && $*VM.version >= v2018.12 {
+    if $*VM.version >= v2018.12 {
         my Int           $fd     = $!socket.native-descriptor;
         my Pointer[void] $optval = nativecast(Pointer[void], CArray[int32].new: 1);
         setsockopt($fd, SOL_SOCKET, SO_OOBINLINE, $optval, nativesizeof(int32));
