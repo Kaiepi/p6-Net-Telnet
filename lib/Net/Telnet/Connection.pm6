@@ -225,6 +225,5 @@ method !send-subnegotiation(TelnetOption $option --> Promise) {
 }
 
 method close(--> Bool) {
-    return False if self.closed;
     $!socket.close
 }
