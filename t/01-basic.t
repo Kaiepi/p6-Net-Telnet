@@ -21,6 +21,7 @@ my Int $port = 8000;
         :$port,
         :preferred<SGA>,
         :supported<NAWS>;
+    my Promise             $p      .= new;
 
     $client.text.tap(-> $text {
         is $text, 'ayy lmao', 'Can emit text messages received by the client';
@@ -50,9 +51,11 @@ my Int $port = 8000;
         ok $connection.preferred('SGA'), 'Can get server preferred options';
         ok $connection.supported('NAWS'), 'Can get server supported options';
         await $connection.send: 'ayy lmao';
+        $p.keep;
     });
 
     lives-ok { await $client.connect }, 'Can open new connections with clients';
+    await $p;
     is $client.host, '127.0.0.1', 'Can get client host';
     is $client.port, 8000, 'Can get client port';
     ok $client.preferred('NAWS'), 'Can get client preferred options';
