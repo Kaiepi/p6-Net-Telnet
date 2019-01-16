@@ -38,8 +38,8 @@ has Int $.peer-height = 0;
 has Tap $!terminal;
 
 has Net::Telnet::Chunk::Actions $!actions        .= new;
-has Int                         $!failed-matches  = 0;
-has Blob                        $!parser-buf     .= new;
+has atomicint                   $!failed-matches  = 0;
+has Blob                        $!remainder      .= new;
 
 method closed(--> Bool) {
     $!close-promise.status ~~ Kept
@@ -104,7 +104,7 @@ method !on-connect(IO::Socket::Async $!socket) {
 
 method !on-close {
     $!close-promise.keep;
-    $!parser-buf .= new;
+    $!remainder .= new;
     $!text.done;
     $!terminal.close;
 }
@@ -125,16 +125,15 @@ method !negotiate-on-init {
     }
 }
 
-method parse(Blob $data) {
-    my Blob                        $buf    = $!parser-buf.elems ?? $!parser-buf.splice.append($data) !! $data;
-    my Str                         $msg    = $buf.decode('latin1');
-    my Net::Telnet::Chunk::Grammar $match .= subparse($msg, :$!actions);
+method parse(Blob $incoming) {
+    my Blob                        $data     = $!remainder ~ $incoming;
+    my Str                         $message  = $data.decode: 'latin1';
+    my Net::Telnet::Chunk::Grammar $match   .= subparse($message, :$!actions);
 
     if $match.ast ~~ Nil {
-        self.close if ++$!failed-matches >= 3;
-        return;
-    } else {
-        $!failed-matches = 0 if $!failed-matches;
+        return self.close if ++⚛$!failed-matches >= 3;
+    } elsif ⚛$!failed-matches {
+        $!failed-matches ⚛= 0;
     }
 
     for $match.ast -> $chunk {
@@ -157,7 +156,11 @@ method parse(Blob $data) {
         }
     }
 
-    $!parser-buf = $match.postmatch.encode('latin1') if $match.postmatch;
+    if $match.postmatch {
+        $!remainder ~= $match.postmatch.encode: 'latin1';
+    } else {
+        $!remainder .= new;
+    }
 }
 
 method !parse-command(Net::Telnet::Command $command) {
