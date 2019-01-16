@@ -96,7 +96,7 @@ method !on-connect(IO::Socket::Async $!socket) {
     $!terminal    = signal(SIGWINCH).tap({
         $!host-width  = Net::Telnet::Terminal.width;
         $!host-height = Net::Telnet::Terminal.height;
-        self!send-subnegotiation(NAWS) if $!options{NAWS} && $!options{NAWS}.us == YES;
+        self!send-subnegotiation(NAWS) if $!options{NAWS}.enabled: :local;
     });
 
     self

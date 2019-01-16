@@ -14,6 +14,9 @@ has OptionQueue  $.usq       = EMPTY;  # The queue bit of the option for this en
 has OptionState  $.them      = NO;     # The state of the option for the opposite end of the connection.
 has OptionQueue  $.themq     = EMPTY;  # The queue bit of the option for the opposite end of the connection.
 
+multi method enabled(Bool :$local! --> Bool)  { $!us == YES   }
+multi method enabled(Bool :$remote! --> Bool) { $!them == YES }
+
 method on-receive-will(--> TelnetCommand) {
     my TelnetCommand $to-send;
 
