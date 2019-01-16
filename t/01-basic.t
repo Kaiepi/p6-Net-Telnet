@@ -115,7 +115,7 @@ my Int $port = 8000;
         :$port;
 
     $server.listen.tap(-> $connection {
-        await $connection.send: "\x[FF]\x[FA]\x[FF]\x[F0]" for 0..^3;
+        await $connection.send: "\x[FF]\x[FA]\x[FF]\x[F0]".encode: 'latin1' for 0..^3;
     });
 
     await $client.connect;

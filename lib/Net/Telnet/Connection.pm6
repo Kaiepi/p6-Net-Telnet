@@ -39,7 +39,7 @@ has Tap $!terminal;
 
 has Net::Telnet::Chunk::Actions $!actions        .= new;
 has atomicint                   $!failed-matches  = 0;
-has Blob                        $!remainder      .= new;
+has buf8                        $!remainder      .= new;
 
 method closed(--> Bool) {
     $!close-promise.status ~~ Kept
@@ -156,7 +156,9 @@ method parse(Blob $incoming) {
         }
     }
 
-    if $match.postmatch {
+    if $match.ast ~~ Nil {
+        $!remainder ~= $data;
+    } elsif $match.postmatch {
         $!remainder ~= $match.postmatch.encode: 'latin1';
     } else {
         $!remainder .= new;
