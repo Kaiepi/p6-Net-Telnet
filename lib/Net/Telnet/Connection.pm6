@@ -9,11 +9,11 @@ use Net::Telnet::Subnegotiation;
 use Net::Telnet::Terminal;
 unit role Net::Telnet::Connection;
 
-my constant SO_OOBINLINE = do given $*VM.osname {
+my Int constant SO_OOBINLINE = do given $*VM.osname {
     when 'linux' { 0x000A }
     default      { 0x0100 }
 };
-my constant SOL_SOCKET   = do given $*VM.osname {
+my Int constant SOL_SOCKET   = do given $*VM.osname {
     when 'linux' { 0x0001 }
     default      { 0xFFFF }
 };
@@ -25,6 +25,10 @@ has Str               $.host;
 has Int               $.port;
 has Promise           $.close-promise .= new;
 has Supplier          $.text          .= new;
+
+has Lock::Async $!negotiations-mux         .= new;
+has Promise     %!pending-negotiations;
+has Promise     %!pending-subnegotiations;
 
 has Lock::Async $!options-mux .= new;
 has Map         $.options;
@@ -50,15 +54,15 @@ method text(--> Supply) {
 }
 
 method supported(Str $option --> Bool) {
-    @!supported.contains: $option
+    @!supported ∋ $option
 }
 
 method preferred(Str $option --> Bool) {
-    @!preferred.contains: $option
+    @!preferred ∋ $option
 }
 
 method new(
-    Str :$host,
+    Str :$host = 'localhost',
     Int :$port = 23,
         :$preferred = [],
         :$supported = [],
@@ -66,13 +70,12 @@ method new(
 ) {
     my Str @preferred = |$preferred;
     my Str @supported = |$supported;
-    my Map $options  .= new: TelnetOption.enums.kv.map: -> $k, $v {
+    my Map $options  .= new: TelnetOption.enums.kv.map(-> $k, $v {
         my TelnetOption $option    = TelnetOption($v);
-        my Bool         $supported = @supported.contains: $k;
-        my Bool         $preferred = @preferred.contains: $k;
+        my Bool         $supported = @supported ∋ $k;
+        my Bool         $preferred = @preferred ∋ $k;
         $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred;
-    };
-
+    });
     self.bless: :$host, :$port, :$options, :@supported, :@preferred, |%args;
 }
 
@@ -111,18 +114,18 @@ method !on-close {
 
 # This is left up to the implementation to decide when to call.
 method !negotiate-on-init {
-    $!options-mux.protect: {
+    $!options-mux.protect({
         for $!options.values -> $option {
             if $option.preferred {
                 my TelnetCommand $command = $option.on-send-will;
-                await self!send-negotiation: $command, $option.option if defined $command;
+                self!send-negotiation: $command, $option.option if defined $command;
             }
             if $option.supported {
                 my TelnetCommand $command = $option.on-send-do;
-                await self!send-negotiation: $command, $option.option if defined $command;
+                self!send-negotiation: $command, $option.option if defined $command;
             }
         }
-    }
+    })
 }
 
 method parse(Blob $incoming) {
@@ -170,34 +173,46 @@ method !parse-command(Net::Telnet::Command $command) {
 }
 
 method !parse-negotiation(Net::Telnet::Negotiation $negotiation) {
-    $!options-mux.protect: {
-        my Net::Telnet::Option $option = $!options{$negotiation.option};
-        my TelnetCommand       $command;
+    $!negotiations-mux.protect({
+        if %!pending-negotiations ∋ $negotiation.option {
+            return self.close if %!pending-negotiations{$negotiation.option}.status ~~ Kept;
+            %!pending-negotiations{$negotiation.option}.keep: $negotiation.command;
+        }
+    });
 
-        given $negotiation.command {
-            when DO   { $command = $option.on-receive-do   }
-            when DONT { $command = $option.on-receive-dont }
-            when WILL { $command = $option.on-receive-will }
-            when WONT { $command = $option.on-receive-wont }
+    $!options-mux.protect({
+        my Net::Telnet::Option $option  = $!options{$negotiation.option};
+        my TelnetCommand       $command = do given $negotiation.command {
+            when DO   { $option.on-receive-do   }
+            when DONT { $option.on-receive-dont }
+            when WILL { $option.on-receive-will }
+            when WONT { $option.on-receive-wont }
         }
 
         if defined $command {
-            await self!send-negotiation($command, $negotiation.option);
+            self!send-negotiation($command, $negotiation.option);
             given $negotiation.command {
-                when WILL { await self!send-subnegotiation: $negotiation.option if $option.them == YES }
-                when DO   { await self!send-subnegotiation: $negotiation.option if $option.us   == YES }
+                when WILL { self!send-subnegotiation: $negotiation.option if $option.them == YES }
+                when DO   { self!send-subnegotiation: $negotiation.option if $option.us   == YES }
             }
         }
-    }
+    })
 }
 
 method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation) {
-    given $subnegotiation.option {
-        when NAWS {
-            $!peer-width  = $subnegotiation.width;
-            $!peer-height = $subnegotiation.height;
+    $!negotiations-mux.protect({
+        if %!pending-subnegotiations ∋ $subnegotiation.option {
+            return self.close if %!pending-subnegotiations{$subnegotiation.option}.status ~~ Kept;
+            %!pending-subnegotiations{$subnegotiation.option}.keep: $subnegotiation.command;
         }
-    }
+
+        given $subnegotiation.option {
+            when NAWS {
+                $!peer-width  = $subnegotiation.width;
+                $!peer-height = $subnegotiation.height;
+            }
+        }
+    })
 }
 
 method !parse-text(Str $text) {
@@ -207,26 +222,31 @@ method !parse-text(Str $text) {
 multi method send(Blob $data --> Promise) { $!socket.write: $data }
 multi method send(Str  $data --> Promise) { $!socket.print: $data }
 
-method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promise) {
-    my Net::Telnet::Negotiation $negotiation .= new: :$command, :$option;
-    say '[SEND] ', $negotiation;
-    self.send: $negotiation.serialize
+method !send-negotiation(TelnetCommand $command, TelnetOption $option) {
+    $!negotiations-mux.protect({
+        my Net::Telnet::Negotiation $negotiation .= new: :$command, :$option;
+        %!pending-negotiations{$option} .= new;
+        say '[SEND] ', $negotiation;
+        await self.send: $negotiation.serialize
+    })
 }
 
-method !send-subnegotiation(TelnetOption $option --> Promise) {
-    my Net::Telnet::Subnegotiation $subnegotiation;
+method !send-subnegotiation(TelnetOption $option) {
+    $!negotiations-mux.protect({
+        my Net::Telnet::Subnegotiation $subnegotiation = do given $option {
+            when NAWS {
+                Net::Telnet::Subnegotiation::NAWS.new:
+                    width  => $!host-width,
+                    height => $!host-height
+            }
+            default { Nil }
+        };
+        return Promise.start({ 0 }) unless defined $subnegotiation;
 
-    given $option {
-        when NAWS {
-            $subnegotiation = Net::Telnet::Subnegotiation::NAWS.new:
-                width  => $!host-width,
-                height => $!host-height
-        }
-    }
-
-    return Promise.start({ 0 }) unless defined $subnegotiation;
-    say '[SEND] ', $subnegotiation;
-    self.send: $subnegotiation.serialize
+        %!pending-subnegotiations{$option} .= new;
+        say '[SEND] ', $subnegotiation;
+        await self.send: $subnegotiation.serialize
+    })
 }
 
 method close(--> Bool) {

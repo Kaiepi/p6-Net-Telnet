@@ -1,5 +1,6 @@
 use v6.c;
 use Net::Telnet::Connection;
+use Net::Telnet::Constants;
 use Net::Telnet::Option;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
@@ -16,22 +17,22 @@ method connect(--> Promise) {
 # should we send our negotiations, and only if the server *didn't* tell us to
 # already.
 method !negotiate-on-init {
-    $!options-mux.protect: {
+    $!options-mux.protect({
         for $!options.values -> $option {
             if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
                 my $command = $option.on-send-will;
-                await self!send-negotiation: $command, $option.option if defined $command;
+                self!send-negotiation: $command, $option.option if defined $command;
             }
             if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
                 my $command = $option.on-send-do;
-                await self!send-negotiation: $command, $option.option if defined $command;
+                self!send-negotiation: $command, $option.option if defined $command;
             }
         }
-    }
+    })
 }
 
 method !parse-text(Str $text) {
-    if !$!negotiated {
+    unless $!negotiated {
         $!negotiated = True;
         self!negotiate-on-init;
     }

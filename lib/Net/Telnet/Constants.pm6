@@ -1,10 +1,10 @@
 use v6.c;
 unit module Net::Telnet::Constants;
 
-subset UInt8  of Int is export where 0..0xFF;
-subset UInt16 of Int is export where 0..0xFFFF;
+my subset UInt8  of Int is export where 0..0xFF;
+my subset UInt16 of Int is export where 0..0xFFFF;
 
-enum TelnetCommand is export (
+my enum TelnetCommand is export (
     'SE'   => 0xF0.chr, # Negotiation End
     'NOP'  => 0xF1.chr, # No Operation
     'DM'   => 0xF2.chr, # Data Mark
@@ -23,7 +23,7 @@ enum TelnetCommand is export (
     'IAC'  => 0xFF.chr  # Interpret As Command
 );
 
-enum TelnetOption is export (
+my enum TelnetOption is export (
     'TRANSMIT_BINARY'     => 0x00.chr,
     'ECHO'                => 0x01.chr,
     'RCP'                 => 0x02.chr, # Reconnection
@@ -79,3 +79,5 @@ enum TelnetOption is export (
     'PRAGMA_HEARTBEAT'    => 0x8C.chr,
     'EXOPL'               => 0xFF.chr
 );
+
+my Set constant Subnegotiators is export .= new: NAWS;
