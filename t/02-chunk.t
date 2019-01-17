@@ -7,9 +7,9 @@ use Net::Telnet::Subnegotiation::NAWS;
 use Net::Telnet::Subnegotiation::Unsupported;
 use Test;
 
-plan 23;
+plan 25;
 
-my $actions = Net::Telnet::Chunk::Actions.new;
+my Net::Telnet::Chunk::Actions $actions .= new;
 
 {
     my $msg = "{IAC}{AYT}";
@@ -33,6 +33,13 @@ my $actions = Net::Telnet::Chunk::Actions.new;
 }
 
 {
+    my $msg = "{IAC}{DO}{TRANSMIT_BINARY}\x[01]\x[02]\x[03]{IAC}{DONT}{TRANSMIT_BINARY}";
+    my $match = Net::Telnet::Chunk::Grammar.subparse($msg, :$actions).ast;
+    cmp-ok $match, '!~~', Nil, 'Can handle binary transmissions';
+    cmp-ok $match[1], 'eqv', Blob.new(1, 2, 3), 'Can match binary data';
+}
+
+{
     my $msg = "{IAC}{SB}{NAWS}\x[00]\x[FF]\x[FF]\x[00]\x[FF]\x[FF]{IAC}{SE}";
     my $match = Net::Telnet::Chunk::Grammar.subparse($msg, :$actions, :rule<chunk>).ast;
     cmp-ok $match, '~~', Net::Telnet::Subnegotiation::NAWS, 'Can match NAWS subnegotiations';
@@ -53,3 +60,5 @@ my $actions = Net::Telnet::Chunk::Actions.new;
     is $match.serialize.decode('latin1'), $msg, 'Can serialize unsupported subnegotiations';
     is $match.Str, $msg, 'Can stringify unsupported subnegotiations';
 }
+
+# vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

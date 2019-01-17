@@ -3,6 +3,8 @@ use Net::Telnet::Constants;
 use Net::Telnet::Option;
 use Test;
 
+plan 48;
+
 {
     my Net::Telnet::Option $option .= new:
         option    => TRANSMIT_BINARY,
@@ -91,4 +93,4 @@ use Test;
 	is $option.us, YES, 'Sets state to YES while enabled locally on the queue';
 }
 
-done-testing;
+# vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

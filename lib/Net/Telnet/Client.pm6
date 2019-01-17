@@ -4,8 +4,6 @@ use Net::Telnet::Constants;
 use Net::Telnet::Option;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
-has Bool $!negotiated = False;
-
 method connect(--> Promise) {
     IO::Socket::Async.connect($!host, $!port).then(-> $p {
         self!on-connect: $p.result;
@@ -17,26 +15,22 @@ method connect(--> Promise) {
 # should we send our negotiations, and only if the server *didn't* tell us to
 # already.
 method !negotiate-on-init {
-    $!options-mux.protect({
-        for $!options.values -> $option {
-            if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
-                my $command = $option.on-send-will;
-                self!send-negotiation: $command, $option.option if defined $command;
-            }
-            if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
-                my $command = $option.on-send-do;
-                self!send-negotiation: $command, $option.option if defined $command;
-            }
+    for $!options.values -> $option {
+        if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
+            my $command = $option.on-send-will;
+            self!send-negotiation: $command, $option.option if defined $command;
         }
-    })
+        if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
+            my $command = $option.on-send-do;
+            self!send-negotiation: $command, $option.option if defined $command;
+        }
+    }
+
+    $!negotiated.keep;
 }
 
 method !parse-text(Str $text) {
-    unless $!negotiated {
-        $!negotiated = True;
-        self!negotiate-on-init;
-    }
-
+    self!negotiate-on-init unless $!negotiated.status ~~ Kept;
     $!text.emit: $text;
 }
 
@@ -76,9 +70,13 @@ The host with which the client will connect.
 
 The port with which the client will connect.
 
+=item Promise B<$.negotiated>
+
+This promise is kept once the connection finishes sending its initial negotiations.
+
 =item Promise B<$.close-promise>
 
-A promise that is kept once the connection is closed.
+This promise is kept once the connection is closed.
 
 =item Map B<$.options>
 
@@ -110,6 +108,11 @@ Whether or not the connection is currently closed.
 =item B<text>(--> Supply)
 
 Returns the supply to which text received by the client is emitted.
+
+=item B<binary>(--> Supply)
+
+Returns the supply to which chunks of binary data received by the client are
+emitted.
 
 =item B<supported>(Str $option --> Bool)
 
@@ -146,9 +149,5 @@ Parses messages received from the server.
 =item B<close>(--> Bool)
 
 Closes the connection to the server, if any is open.
-
-=head1 AUTHOR
-
-Ben Davies (kaiepi)
 
 =end pod

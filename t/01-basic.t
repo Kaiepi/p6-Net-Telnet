@@ -5,7 +5,7 @@ use Net::Telnet::Option;
 use Net::Telnet::Server;
 use Test;
 
-plan 24;
+plan 25;
 
 my Str $host = '127.0.0.1';
 my Int $port = 8000;
@@ -123,3 +123,36 @@ my Int $port = 8000;
     ok $client.closed, 'Connection gets closed after 3 messages breaking protocol in a row';
     $server.close;
 }
+
+{
+    my Net::Telnet::Client $client .= new:
+        :$host,
+        :$port,
+        :supported<TRANSMIT_BINARY>;
+    my Net::Telnet::Server $server .= new:
+        :$host,
+        :$port,
+        :preferred<TRANSMIT_BINARY>;
+    my Blob                $in     .= new: 1,2,3;
+    my Promise             $p      .= new;
+
+    $server.listen.tap(-> $connection {
+        my Blob $out .= new;
+        await $connection.send: 'Transmitting...';
+        $connection.binary.tap(-> $data {
+            $out ~= $data;
+        }, done => {
+            cmp-ok $out, 'eqv', $in, 'Can receive binary transmissions';
+            $p.keep;
+        });
+    });
+
+    await $client.connect;
+    await $client.negotiated;
+    await $client.send-binary: $in;
+    $client.close;
+    await $p;
+    $server.close;
+}
+
+# vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

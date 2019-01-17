@@ -6,19 +6,46 @@ use Net::Telnet::Subnegotiation::NAWS;
 use Net::Telnet::Subnegotiation::Unsupported;
 unit module Net::Telnet::Chunk;
 
+# Whether or not the data the peer's sending should be parsed as binary data or
+# as text. IAC WILL TRANSMIT_BINARY enables this, while any other command
+# combined with TRANSMIT_BINARY disables it. "But what if the peer's not smart
+# enough to wait for us to reply with IAC DO TRANSMIT_BINARY before sending
+# anything else?" you're probably asking. This is only a problem if the peer
+# chooses to send text in between sending IAC WILL TRANSMIT_BINARY and
+# receiving IAC DO TRANSMIT_BINARY.
+my Bool $GLOBAL-BINARY = False;
+
 grammar Grammar {
     token TOP { <chunk>+ }
 
     token chunk {
-        || <text>
+        :my Bool $*BINARY = $GLOBAL-BINARY;
+        [
         || <command>
         || <negotiation>
         || <subnegotiation>
+        || <blob>
+        || <text>
+        ]
+        { $GLOBAL-BINARY = $*BINARY }
+    }
+
+    token byte {
+        [
+        | <[\x[00]..\x[FE]]>
+        | \x[FF] ** 2
+        ]
+    }
+
+    token blob {
+        <?{ $*BINARY }> <byte>+
     }
 
     # TELNET data is ASCII encoded. Extended ASCII is supported, but characters
     # outside the normal ASCII range are sent as XASCII subnegotiations.
-    token text { <:ascii>+ }
+    token text {
+        <!{ $*BINARY }> <:ascii>+
+    }
 
     token command {
         \x[FF]
@@ -29,17 +56,13 @@ grammar Grammar {
         \x[FF]
         <command=[\x[FB]..\x[FE]]>
         <option=[\x[00]..\x[FF]]>
+        { $*BINARY = ~$<command> eq DO if ~$<option> eq TRANSMIT_BINARY }
     }
 
     token subnegotiation {
         \x[FF] \x[FA]
         <subnegotiation-data>
         \x[FF] \x[F0]
-    }
-
-    token byte {
-        | <[\x[00]..\x[FE]]>
-        | \x[FF] ** 2
     }
 
     proto token subnegotiation-data {*}
@@ -58,6 +81,7 @@ class Actions {
 
     method chunk($/) {
         given $/ {
+            when $<blob>           { make $<blob>.ast           }
             when $<text>           { make $<text>.ast           }
             when $<command>        { make $<command>.ast        }
             when $<negotiation>    { make $<negotiation>.ast    }
@@ -65,7 +89,17 @@ class Actions {
         }
     }
 
-    method text($/ --> Str) { make ~$/ }
+    method byte($/ --> UInt8) {
+        make $/.ord
+    }
+
+    method blob($/ --> Blob) {
+        make Blob.new: $<byte>».ast
+    }
+
+    method text($/ --> Str) {
+        make ~$/
+    }
 
     method command($/ --> Net::Telnet::Command) {
         make Net::Telnet::Command.new(command => TelnetCommand(~$<command>))
@@ -81,8 +115,6 @@ class Actions {
     method subnegotiation($/ --> Net::Telnet::Subnegotiation) {
         make $<subnegotiation-data>.ast
     }
-
-    method byte($/ --> UInt8) { make $/.ord }
 
     method subnegotiation-data:sym(NAWS)($/ --> Net::Telnet::Subnegotiation::NAWS) {
         my @bytes  = $<byte>».ast;
