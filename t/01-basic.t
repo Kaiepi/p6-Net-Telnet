@@ -45,6 +45,7 @@ my Int $port = 8000;
             }
         });
 
+        await $connection.negotiated;
         is $connection.id, 0, 'First connection received has an ID of 0';
         is $connection.host, $server.host, 'Can receive connections on 127.0.0.1';
         isnt $connection.port, $server.host, 'Connections are received on a different port from the server';
@@ -55,6 +56,7 @@ my Int $port = 8000;
     });
 
     lives-ok { await $client.connect }, 'Can open new connections with clients';
+    await $client.negotiated;
     await $p;
     is $client.host, '127.0.0.1', 'Can get client host';
     is $client.port, 8000, 'Can get client port';
@@ -138,6 +140,7 @@ my Int $port = 8000;
 
     $server.listen.tap(-> $connection {
         my Blob $out .= new;
+        await $connection.negotiated;
         await $connection.send: 'Transmitting...';
         $connection.binary.tap(-> $data {
             $out ~= $data;
