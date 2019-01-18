@@ -7,12 +7,8 @@ use Net::Telnet::Subnegotiation::Unsupported;
 unit module Net::Telnet::Chunk;
 
 # Whether or not the data the peer's sending should be parsed as binary data or
-# as text. IAC WILL TRANSMIT_BINARY enables this, while any other command
-# combined with TRANSMIT_BINARY disables it. "But what if the peer's not smart
-# enough to wait for us to reply with IAC DO TRANSMIT_BINARY before sending
-# anything else?" you're probably asking. This is only a problem if the peer
-# chooses to send text in between sending IAC WILL TRANSMIT_BINARY and
-# receiving IAC DO TRANSMIT_BINARY.
+# as text. IAC DO TRANSMIT_BINARY enables this, while any other command
+# combined with TRANSMIT_BINARY disables it.
 my Bool $GLOBAL-BINARY = False;
 
 grammar Grammar {
