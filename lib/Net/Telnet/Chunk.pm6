@@ -40,7 +40,7 @@ grammar Grammar {
     # TELNET data is ASCII encoded. Extended ASCII is supported, but characters
     # outside the normal ASCII range are sent as XASCII subnegotiations.
     token text {
-        <!{ $*BINARY }> <:ascii>+
+        <!{ !$*BINARY }> <:ascii>+
     }
 
     token command {
