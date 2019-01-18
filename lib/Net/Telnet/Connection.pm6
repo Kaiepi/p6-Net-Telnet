@@ -235,10 +235,9 @@ method send-binary(Blob $data --> Promise) {
         unless $!options{TRANSMIT_BINARY}.enabled: :remote {
             my TelnetCommand $res = await %!pending-negotiations{TRANSMIT_BINARY} if %!pending-negotiations{TRANSMIT_BINARY}:exists;
             unless defined($res) && $res eq DO {
-                await self!send-negotiation(WILL, TRANSMIT_BINARY).then({
-                    $res = await %!pending-negotiations{TRANSMIT_BINARY};
-                    die "Failed to send binary data because the peer ($!host:$!port) refused to enable TRANSMIT_BINARY" unless $res eq DO;
-                });
+                await self!send-negotiation: WILL, TRANSMIT_BINARY;
+                $res = await %!pending-negotiations{TRANSMIT_BINARY};
+                die "Failed to send binary data because the peer ($!host:$!port) refused to enable TRANSMIT_BINARY" unless $res eq DO;
             }
         }
 
