@@ -129,6 +129,8 @@ method !negotiate-on-init {
             await self!send-negotiation: $command, $option.option if defined $command;
         }
     }
+
+    $!negotiated.keep;
 }
 
 method parse(Blob $incoming) {
