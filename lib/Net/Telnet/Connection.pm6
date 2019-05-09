@@ -241,15 +241,19 @@ method send-text(Str $data --> Promise) {
 method send-binary(Blob $data --> Promise) {
     start {
         unless $!options{TRANSMIT_BINARY}.enabled: :remote {
-            my TelnetCommand $res = await %!pending-negotiations{TRANSMIT_BINARY} if %!pending-negotiations{TRANSMIT_BINARY}:exists;
-            unless $res.defined && $res eq DO {
+            my Promise       $negotiation = %!pending-negotiations{TRANSMIT_BINARY};
+            my TelnetCommand $res         = await $negotiation if $negotiation;
+            if !$res.defined || $res ne DO {
                 await self!send-negotiation: WILL, TRANSMIT_BINARY;
-                $res = await %!pending-negotiations{TRANSMIT_BINARY};
-                X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw unless $res eq DO;
+                $negotiation = %!pending-negotiations{TRANSMIT_BINARY};
+                $res         = await $negotiation;
+                X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw
+                    unless $res eq DO;
             }
         }
 
-        await self.send: Blob.new: $data.reduce({ $^b == 0xFF ?? (|$^a, $^b, $^b) !! (|$^a, $^b) });
+        my Blob $escaped-data .= new: $data.reduce({ $^b == 0xFF ?? (|$^a, $^b, $^b) !! (|$^a, $^b) });
+        await self.send: $escaped-data;
         await self!send-negotiation: WONT, TRANSMIT_BINARY;
     }
 }
