@@ -11,7 +11,8 @@ class Connection does Net::Telnet::Connection {
     }
 }
 
-has Tap $.socket;
+has IO::Socket::Async::ListenSocket $.socket;
+
 has Str $.host;
 has Int $.port;
 

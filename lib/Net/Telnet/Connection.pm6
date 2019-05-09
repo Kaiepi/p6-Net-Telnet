@@ -3,6 +3,7 @@ use NativeCall;
 use Net::Telnet::Chunk;
 use Net::Telnet::Command;
 use Net::Telnet::Constants;
+use Net::Telnet::Exceptions;
 use Net::Telnet::Negotiation;
 use Net::Telnet::Option;
 use Net::Telnet::Subnegotiation;
@@ -136,10 +137,10 @@ method !negotiate-on-init {
 method parse(Blob $incoming) {
     my Blob                        $data     = $!remainder ~ $incoming;
     my Str                         $message  = $data.decode: 'latin1';
-    my Net::Telnet::Chunk::Grammar $match   .= subparse($message, :$!actions);
+    my Net::Telnet::Chunk::Grammar $match   .= subparse: $message, :$!actions;
 
-    if $match.ast ~~ Nil {
-        return self.close if ++⚛$!failed-matches >= 3;
+    if $match.ast ~~ Nil && ++⚛$!failed-matches >= 3 {
+        X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$!remainder).throw;
     } elsif ⚛$!failed-matches {
         $!failed-matches ⚛= 0;
     }
@@ -171,7 +172,7 @@ method parse(Blob $incoming) {
         $!remainder ~= $data;
     } elsif $match.postmatch {
         $!remainder ~= $match.postmatch.encode: 'latin1';
-    } else {
+    } elsif $!remainder {
         $!remainder .= new;
     }
 }
@@ -236,10 +237,10 @@ method send-binary(Blob $data --> Promise) {
     start {
         unless $!options{TRANSMIT_BINARY}.enabled: :remote {
             my TelnetCommand $res = await %!pending-negotiations{TRANSMIT_BINARY} if %!pending-negotiations{TRANSMIT_BINARY}:exists;
-            unless defined($res) && $res eq DO {
+            unless $res.defined && $res eq DO {
                 await self!send-negotiation: WILL, TRANSMIT_BINARY;
                 $res = await %!pending-negotiations{TRANSMIT_BINARY};
-                die "Failed to send binary data because the peer ($!host:$!port) refused to enable TRANSMIT_BINARY" unless $res eq DO;
+                X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw unless $res eq DO;
             }
         }
 

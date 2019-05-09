@@ -1,33 +1,24 @@
 use v6.c;
 use Net::Telnet::Client;
 use Net::Telnet::Constants;
+use Net::Telnet::Exceptions;
 use Net::Telnet::Option;
 use Net::Telnet::Server;
 use Test;
 
-plan 25;
+plan 24;
 
 my Str $host = '127.0.0.1';
-my Int $port = 8000;
+my Int $port = 0;
 
 {
-    my Net::Telnet::Client $client .= new:
-        :$host,
-        :$port,
-        :preferred<NAWS>,
-        :supported<SGA>;
+    my Promise $p .= new;
+
     my Net::Telnet::Server $server .= new:
         :$host,
         :$port,
         :preferred<SGA>,
         :supported<NAWS>;
-    my Promise             $p      .= new;
-
-    $client.text.tap(-> $text {
-        is $text, 'ayy lmao', 'Can emit text messages received by the client';
-        $client.close;
-    });
-
     $server.listen.tap(-> $connection {
         $connection.text.tap(done => {
             is $connection.closed, True, 'Connection closed state is accurate after the client closes the connection';
@@ -54,10 +45,21 @@ my Int $port = 8000;
         $p.keep;
     });
 
+    temp $port = await $server.socket.socket-port;
+    my Net::Telnet::Client $client .= new:
+        :$host,
+        :$port,
+        :preferred<NAWS>,
+        :supported<SGA>;
+    $client.text.tap(-> $text {
+        is $text, 'ayy lmao', 'Can emit text messages received by the client';
+        $client.close;
+    });
+
     lives-ok { await $client.connect }, 'Can open new connections with clients';
     await $p;
     is $client.host, '127.0.0.1', 'Can get client host';
-    is $client.port, 8000, 'Can get client port';
+    is $client.port, $port, 'Can get client port';
     ok $client.preferred('NAWS'), 'Can get client preferred options';
     ok $client.supported('SGA'), 'Can get client supported options';
 	await $client.close-promise;
@@ -79,25 +81,20 @@ my Int $port = 8000;
 }
 
 {
-    my Net::Telnet::Client $client .= new:
-        :$host,
-        :$port;
-    my Net::Telnet::Server $server .= new:
-        :$host,
-        :$port;
     my Promise $p1 .= new;
     my Promise $p2 .= new;
 
-    $client.text.tap(done => {
-        $p1.keep;
-    });
-
+    my Net::Telnet::Server $server .= new: :$host, :$port;
     $server.listen.tap(-> $connection {
         $connection.close;
         await $p1;
         is $connection.closed, True, 'Connection closed state is accurate after the server closes the connection';
         $p2.keep;
     });
+
+    temp $port = await $server.socket.socket-port;
+    my Net::Telnet::Client $client .= new: :$host, :$port;
+    $client.text.tap(done => { $p1.keep });
 
     await $client.connect;
     await $p2;
@@ -107,35 +104,40 @@ my Int $port = 8000;
 }
 
 {
-    my Net::Telnet::Client $client .= new:
-        :$host,
-        :$port;
-    my Net::Telnet::Server $server .= new:
-        :$host,
-        :$port;
-
+    my Net::Telnet::Server $server .= new: :$host, :$port;
     $server.listen.tap(-> $connection {
         await $connection.send: "\x[FF]\x[FA]\x[FF]\x[F0]".encode: 'latin1' for 0..^3;
     });
 
+    temp $port = await $server.socket.socket-port;
+    my Net::Telnet::Client $client .= new: :$host, :$port;
+
+    my Cancellation $c = $*SCHEDULER.cue({
+        flunk 'Connection throws X::Net::Telnet::ProtocolViolation after receiving data that violates protocol';
+        $client.close;
+        $server.close;
+    }, in => 5);
+
     await $client.connect;
-    await $client.close-promise;
-    ok $client.closed, 'Connection gets closed after 3 messages breaking protocol in a row';
-    $server.close;
+
+    CATCH {
+        when X::Net::Telnet::ProtocolViolation {
+            pass 'Connection throws X::Net::Telnet::ProtocolViolation after receiving data that violates protocol';
+            $c.cancel;
+            $client.close;
+            $server.close;
+        }
+    }
 }
 
 {
-    my Net::Telnet::Client $client .= new:
-        :$host,
-        :$port,
-        :supported<TRANSMIT_BINARY>;
+    my Blob    $in .= new: 1,2,3;
+    my Promise $p  .= new;
+
     my Net::Telnet::Server $server .= new:
         :$host,
         :$port,
         :preferred<TRANSMIT_BINARY>;
-    my Blob                $in     .= new: 1,2,3;
-    my Promise             $p      .= new;
-
     $server.listen.tap(-> $connection {
         my Blob $out .= new;
         await $connection.send: 'Transmitting...';
@@ -146,6 +148,12 @@ my Int $port = 8000;
             $p.keep;
         });
     });
+
+    temp $port = await $server.socket.socket-port;
+    my Net::Telnet::Client $client .= new:
+        :$host,
+        :$port,
+        :supported<TRANSMIT_BINARY>;
 
     await $client.connect;
     await $client.negotiated;
