@@ -230,8 +230,13 @@ method !parse-blob(Blob $data) {
     $!binary.emit: $data;
 }
 
+proto method send($ --> Promise) {*}
 multi method send(Blob $data --> Promise) { $!socket.write: $data }
 multi method send(Str  $data --> Promise) { $!socket.print: $data }
+
+method send-text(Str $data --> Promise) {
+    $!socket.print: "$data\r\n"
+}
 
 method send-binary(Blob $data --> Promise) {
     start {
