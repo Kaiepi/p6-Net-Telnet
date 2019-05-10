@@ -1,4 +1,4 @@
-use v6.c;
+use v6.d;
 use Net::Telnet::Connection;
 use Net::Telnet::Constants;
 use Net::Telnet::Option;
@@ -7,31 +7,37 @@ unit class Net::Telnet::Client does Net::Telnet::Connection;
 method connect(--> Promise) {
     IO::Socket::Async.connect($!host, $!port).then(-> $p {
         self!on-connect: $p.result;
+        self
     })
 }
 
-# We don't want to send any subnegotiations for our supported options until
-# after the server has requested which options should be enabled. Only then
-# should we send our negotiations, and only if the server *didn't* tell us to
-# already.
-method !negotiate-on-init {
+method !send-initial-negotiations {
+    # Wait for the server to send its initial negotiations before sending our
+    # own. This is to avoid race conditions.
+    sleep 1;
+    await $!pending.negotiations.remove: $_ for $!pending.negotiations.keys;
+    # TODO: handle subnegotiations properly. This doesn't matter for now since
+    # NAWS doesn't expect a response and it's the only option we support with
+    # subnegotiations.
+
     for $!options.values -> $option {
         if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
-            my $command = $option.on-send-will;
-            self!send-negotiation: $command, $option.option if defined $command;
+            my TelnetCommand $command = $option.on-send-will;
+            if $command.defined {
+                await self!send-negotiation: $command, $option.option;
+                $!pending.negotiations.remove: $option.option;
+            }
         }
         if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
-            my $command = $option.on-send-do;
-            self!send-negotiation: $command, $option.option if defined $command;
+            my TelnetCommand $command = $option.on-send-do;
+            if $command.defined {
+                await self!send-negotiation: $command, $option.option;
+                $!pending.negotiations.remove: $option.option;
+            }
         }
     }
 
     $!negotiated.keep;
-}
-
-method !parse-text(Str $text) {
-    self!negotiate-on-init unless $!negotiated.status ~~ Kept;
-    $!text.emit: $text;
 }
 
 =begin pod
@@ -140,7 +146,19 @@ The promise returned is resolved once the connection has begun.
 =item B<send>(Blob I<$data> --> Promise)
 =item B<send>(Str I<$data> --> Promise)
 
-Sends a message to the server.
+Sends raw data to the server.
+
+=item B<send-text>(Str I<$data> --> Promise)
+
+Sends a message appended with C<CRLF> to the server.
+
+=item B<send-binary>(Blob I<$data> --> Promise)
+
+Sends binary data to the server. If the server isn't already expecting binary
+data, this will send the necessary TRANSMIT_BINARY negotiations to attempt to
+convince the server to parse incoming data as binary data. This will throw
+C<X::Net::Telnet::TransmitBinary> if the server declines to begin binary data
+transmission.
 
 =item B<parse>(Blob I<$data>)
 

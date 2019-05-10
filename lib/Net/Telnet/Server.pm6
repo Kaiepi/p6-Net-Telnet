@@ -1,14 +1,11 @@
-use v6.c;
+use v6.d;
 use Net::Telnet::Connection;
 unit class Net::Telnet::Server;
 
 class Connection does Net::Telnet::Connection {
-    has Int $.id;
+    trusts Net::Telnet::Server;
 
-    method on-open(IO::Socket::Async $socket) {
-        self!on-connect: $socket;
-        self!negotiate-on-init;
-    }
+    has Int $.id;
 }
 
 has IO::Socket::Async::ListenSocket $.socket;
@@ -16,13 +13,11 @@ has IO::Socket::Async::ListenSocket $.socket;
 has Str $.host;
 has Int $.port;
 
-has Supplier  $.connections .= new;
+has Supplier  $!connections         .= new;
 has atomicint $!next-connection-id;
 
 has Str @.preferred;
 has Str @.supported;
-
-method connections(--> Supply) { $!connections.Supply }
 
 method new(
     Str :$host,
@@ -39,18 +34,18 @@ method listen(--> Supply) {
     $!socket = IO::Socket::Async.listen($!host, $!port).tap(-> $socket {
         self!on-connect: $socket;
     });
+
     $!connections.Supply
 }
 
 method !on-connect(IO::Socket::Async $socket) {
-    my Int $id = $!next-connection-id⚛++;
-    my Connection $connection .= new:
-        :$id,
-        :host($socket.peer-host),
-        :port($socket.peer-port),
-        :@!preferred,
-        :@!supported;
-    $connection.on-open: $socket;
+    my Int $id   = $!next-connection-id⚛++;
+    my Str $host = $socket.peer-host;
+    my Int $port = $socket.peer-port;
+
+    my Connection $connection .= new: :$id, :$host, :$port, :@!preferred, :@!supported;
+    $connection!Connection::on-connect: $socket;
+
     $!connections.emit: $connection;
 }
 
@@ -99,7 +94,7 @@ Net::Telnet::Server is a library for creating Telnet servers.
 
 =head1 ATTRIBUTES
 
-=item Tap B<$.socket>
+=item IO::Socket::Async::ListenSocket B<$.socket>
 
 The server's socket.
 
@@ -110,13 +105,6 @@ The server's hostname.
 =item Int B<$.port>
 
 The server's port.
-
-=item Supplier B<$.connections>
-
-A supplier that emits C<Net::Telnet::Server::Connection> objects when they
-connect to the server. C<Net::Telnet::Server::Connection> objects are similar
-to C<Net::Telnet::Client> objects, but include an additional C<Int> C<$.id>
-attribute to simplify tracking the state of the connection object if needed.
 
 =item Net::Telnet::Option B<@.preferred>
 

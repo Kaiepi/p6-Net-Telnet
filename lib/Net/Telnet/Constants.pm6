@@ -1,4 +1,4 @@
-use v6.c;
+use v6.d;
 unit module Net::Telnet::Constants;
 
 my subset UInt8  of Int is export where 0..0xFF;

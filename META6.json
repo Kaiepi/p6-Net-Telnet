@@ -7,7 +7,7 @@
 	"description" : "Telnet library for clients and servers",
 	"license" : "Artistic-2.0",
 	"name" : "Net::Telnet",
-	"perl" : "6.c",
+	"perl" : "6.d",
 	"provides" : {
 		"Net::Telnet" : "lib/Net/Telnet.pm6",
 		"Net::Telnet::Client" : "lib/Net/Telnet/Client.pm6",
