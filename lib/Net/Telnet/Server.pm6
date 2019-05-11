@@ -34,7 +34,6 @@ method listen(--> Supply) {
     $!socket = IO::Socket::Async.listen($!host, $!port).tap(-> $socket {
         self!on-connect: $socket;
     });
-
     $!connections.Supply
 }
 
