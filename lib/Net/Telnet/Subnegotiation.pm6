@@ -12,16 +12,19 @@ module Net::Telnet {
 
         # Overridden by implementations.
         proto method serialize(--> Blob) {
-            Blob.new:
+            Blob.new(
                 IAC.ord,
                 SB.ord,
                 $!option.ord,
                 |[(), |{*}].reduce({ ($^b == 0xFF) ?? (|$^a, $^b, $^b) !! (|$^a, $^b) }),
                 IAC.ord,
                 SE.ord
+            )
         }
 
-        method Str(--> Str) { self.serialize.decode('latin1') }
+        method Str(--> Str) {
+            self.serialize.decode: 'latin1'
+        }
     }
 
     class Subnegotiation::NAWS does Subnegotiation {
@@ -54,11 +57,7 @@ module Net::Telnet {
         }
 
         multi method gist(--> Str) {
-            $!bytes.map({
-                my $byte = $_.base(16);
-                $byte [R~]= 0 if $byte.chars == 1;
-                $byte
-            }).join(' ')
+            $!bytes.map({ sprintf '%02x', $_ }).join(' ').uc
         }
 
         multi method serialize(--> Blob) {
