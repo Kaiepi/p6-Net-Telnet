@@ -20,7 +20,7 @@ has Str @.preferred;
 has Str @.supported;
 
 method new(
-    Str :$host,
+    Str :$host      = 'localhost',
     Int :$port      = 23,
         :$preferred = [],
         :$supported = []

@@ -14,8 +14,11 @@ has OptionQueue  $.usq       = EMPTY;  # The queue bit of the option for this en
 has OptionState  $.them      = NO;     # The state of the option for the opposite end of the connection.
 has OptionQueue  $.themq     = EMPTY;  # The queue bit of the option for the opposite end of the connection.
 
+proto method enabled(Bool :$local?, Bool :$remote? --> Bool) {*}
 multi method enabled(Bool :$local! --> Bool)   { $!us   == YES }
 multi method enabled(Bool :$remote! --> Bool)  { $!them == YES }
+
+proto method disabled(Bool :$local?, Bool :$remote? --> Bool) {*}
 multi method disabled(Bool :$local! --> Bool)  { $!us   != YES }
 multi method disabled(Bool :$remote! --> Bool) { $!them != YES }
 

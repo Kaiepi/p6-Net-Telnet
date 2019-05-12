@@ -6,7 +6,7 @@ use Net::Telnet::Option;
 use Net::Telnet::Server;
 use Test;
 
-plan 22;
+plan 23;
 
 my Str $host = '127.0.0.1';
 my Int $port = 8080;
@@ -42,6 +42,7 @@ my Int $port = 8080;
             $p.keep;
         });
 
+        await $connection.negotiated;
         is $connection.id, 0, 'First connection received has an ID of 0';
         is $connection.host, $server.host, 'Can receive connections on 127.0.0.1';
         isnt $connection.port, $server.host, 'Connections are received on a different port from the server';
@@ -123,7 +124,7 @@ my Int $port = 8080;
         $connection.binary.tap(-> $data {
             $out ~= $data;
         }, done => {
-            cmp-ok $out, 'eqv', $in, 'Can receive binary transmissions';
+            cmp-ok $out, 'eqv', $in, 'Can receive binary transmissions when TRANSMIT_BINARY is set as a preferred option';
             $p.keep;
         });
     });
@@ -136,4 +137,34 @@ my Int $port = 8080;
     $server.close;
 }
 
+{
+    my Promise $p .= new;
+
+    my Net::Telnet::Server $server .= new:
+        :$host,
+        :$port,
+        :supported<ECHO>;
+    my Net::Telnet::Client $client .= new:
+        :$host,
+        :$port,
+        :preferred<ECHO>;
+
+    $client.text.tap({
+        pass 'Can receive text sent when ECHO is set as a preferred option';
+        $p.keep
+    });
+
+    $server.listen;
+    await $client.connect;
+    await $client.negotiated;
+    await $client.send: "If two astronauts were on the moon and one bashed the other's head in with a rock would that be fucked up or what?";
+
+    await Promise.anyof(
+        Promise.in(5).then({ flunk 'Can receive text sent when ECHO is set as a preferred option' }),
+        $p
+    );
+
+    $client.close;
+    $server.close;
+}
 # vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

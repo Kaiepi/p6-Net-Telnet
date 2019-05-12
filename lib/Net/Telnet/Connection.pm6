@@ -231,6 +231,7 @@ method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation --> Nil
 }
 
 method !parse-text(Str $data --> Nil) {
+    await self.send: $data if $!options{ECHO}.enabled: :remote;
     $!text.emit: $data;
 }
 
