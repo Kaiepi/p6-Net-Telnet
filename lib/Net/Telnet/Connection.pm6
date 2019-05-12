@@ -103,7 +103,11 @@ method !on-connect(IO::Socket::Async $!socket --> Nil) {
     $!terminal    = signal(SIGWINCH).tap({
         $!host-width  = Net::Telnet::Terminal.width;
         $!host-height = Net::Telnet::Terminal.height;
-        await self!send-subnegotiation(NAWS) if $!options{NAWS}.enabled: :local;
+        if $!options{NAWS}.enabled: :local {
+            await self!send-subnegotiation(NAWS);
+            await $!pending.subnegotiations{NAWS};
+            $!pending.subnegotiations.remove: NAWS;
+        }
     });
 
     self!send-initial-negotiations;
@@ -115,6 +119,7 @@ method !send-initial-negotiations(--> Nil) {
             my TelnetCommand $command = $option.on-send-will;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
+                await $!pending.negotiations{$option.option};
                 $!pending.negotiations.remove: $option.option;
             }
         }
@@ -122,6 +127,7 @@ method !send-initial-negotiations(--> Nil) {
             my TelnetCommand $command = $option.on-send-do;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
+                await $!pending.negotiations{$option.option};
                 $!pending.negotiations.remove: $option.option;
             }
         }

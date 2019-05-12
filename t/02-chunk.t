@@ -1,4 +1,4 @@
-use v6.c;
+use v6.d;
 use Net::Telnet::Chunk;
 use Net::Telnet::Command;
 use Net::Telnet::Constants;

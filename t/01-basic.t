@@ -1,4 +1,4 @@
-use v6.c;
+use v6.d;
 use Net::Telnet::Client;
 use Net::Telnet::Constants;
 use Net::Telnet::Exceptions;
