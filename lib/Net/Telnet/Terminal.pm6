@@ -1,6 +1,6 @@
 use v6.d;
 use NativeCall;
-unit class Net::Telnet::Terminal;
+unit module Net::Telnet::Terminal;
 
 # Windows
 class COORD is repr('CStruct') {
@@ -34,18 +34,18 @@ class winsize is repr('CStruct') {
     has uint16 $.ws_ypixel;
 }
 
-constant TIOCGWINSZ = {
-    constant IOCPARM_MASK = 0x1FFF;
-    constant IOC_OUT      = 0x40000000;
-    my $group = 't'.ord;
-    my $num   = 104;
-    my $len   = nativesizeof(winsize);
+constant TIOCGWINSZ = do {
+    my Int constant IOCPARM_MASK = 0x1FFF;
+    my Int constant IOC_OUT      = 0x40000000;
+    my Int $group = 't'.ord;
+    my Int $num   = 104;
+    my Int $len   = nativesizeof(winsize);
     IOC_OUT +| (($len +& IOCPARM_MASK) +< 16) +| ($group +< 8) +| $num
-}();
+};
 
 sub ioctl(int32, uint32, winsize is rw --> int32) is native {*}
 
-method width(--> Int) {
+sub get-terminal-width(--> Int) is export {
     if $*VM.osname eq 'MSWin32' {
         my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
         GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);
@@ -57,7 +57,7 @@ method width(--> Int) {
     }
 }
 
-method height(--> Int) {
+sub get-terminal-height(--> Int) is export {
     if $*VM.osname eq 'MSWin32' {
         my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
         GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);

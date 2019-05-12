@@ -97,11 +97,11 @@ method !on-connect(IO::Socket::Async $!socket) {
         setsockopt($fd, SOL_SOCKET, SO_OOBINLINE, $optval, nativesizeof(int32));
     }
 
-    $!host-width  = Net::Telnet::Terminal.width;
-    $!host-height = Net::Telnet::Terminal.height;
+    $!host-width  = get-terminal-width;
+    $!host-height = get-terminal-height;
     $!terminal    = signal(SIGWINCH).tap({
-        $!host-width  = Net::Telnet::Terminal.width;
-        $!host-height = Net::Telnet::Terminal.height;
+        $!host-width  = get-terminal-width;
+        $!host-height = get-terminal-height;
         if $!options{NAWS}.enabled: :local {
             await self!send-subnegotiation(NAWS);
             await $!pending.subnegotiations.get: NAWS;
