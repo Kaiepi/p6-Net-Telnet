@@ -1,11 +1,11 @@
 use v6.d;
-unit module Net::Telnet:ver<0.0.1>;
+unit module Net::Telnet:ver<0.0.1>:auth<github:Kaiepi>;
 
 =begin pod
 
 =head1 NAME
 
-Net::Telnet - Telnet library for clients and servers
+Net::Telnet - TELNET library for clients and servers
 
 =head1 SYNOPSIS
 
@@ -18,8 +18,8 @@ Net::Telnet - Telnet library for clients and servers
         :preferred[NAWS],
         :supported[SGA, ECHO];
     $client.text.tap({ .print });
+
     await $client.connect;
-    await $client.negotiated;
     await $client.send-text: 'cowsay ayy lmao';
     $client.close;
 
@@ -52,8 +52,22 @@ Net::Telnet - Telnet library for clients and servers
 
 =head1 DESCRIPTION
 
-Net::Telnet is a library for creating Telnet clients and servers. See
-C<Net::Telnet::Client> and C<Net::Telnet::Server> for more documentation.
+C<Net::Telnet> is a library for creating TELNET clients and servers.
+
+Before you get started, read the documentation in the C<docs> directory and
+read the example code in the C<examples> directory.
+
+If you are using C<Net::Telnet::Client> and don't know what options the server
+will attempt to negotiate with, run C<bin/p6telnet-grep-options> using the
+server's host and port to grep the list of options it attempts to negotiate with
+when you first connect to it.
+
+The following options are currently supported:
+
+=item TRANSMIT_BINARY
+=item SGA
+=item ECHO
+=item NAWS
 
 =head1 AUTHOR
 

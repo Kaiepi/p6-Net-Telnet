@@ -42,7 +42,6 @@ my Int $port = 8080;
             $p.keep;
         });
 
-        await $connection.negotiated;
         is $connection.id, 0, 'First connection received has an ID of 0';
         is $connection.host, $server.host, 'Can receive connections on 127.0.0.1';
         isnt $connection.port, $server.host, 'Connections are received on a different port from the server';
@@ -57,7 +56,6 @@ my Int $port = 8080;
     });
 
     await $client.connect;
-    await $client.negotiated;
     await $p;
 
     is $client.host, '127.0.0.1', 'Can get client host';
@@ -134,7 +132,6 @@ my Int $port = 8080;
     });
 
     await $client.connect;
-    await $client.negotiated;
     await $p;
     $client.close;
     $server.close;
@@ -159,7 +156,6 @@ my Int $port = 8080;
 
     $server.listen;
     await $client.connect;
-    await $client.negotiated;
     await $client.send-text: "If two astronauts were on the moon and one bashed the other's head in with a rock would that be fucked up or what?";
     await Promise.anyof(
         Promise.in(5).then({ flunk 'Can receive text sent when ECHO is set as a preferred option' }),

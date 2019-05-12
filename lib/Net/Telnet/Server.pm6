@@ -39,7 +39,7 @@ method listen(--> Supply) {
     $!connections.Supply
 }
 
-method !on-connect(IO::Socket::Async $socket) {
+method !on-connect(IO::Socket::Async $socket --> Nil) {
     my Int $id   = $!next-connection-id⚛++;
     my Str $host = $socket.peer-host;
     my Int $port = $socket.peer-port;
@@ -51,19 +51,19 @@ method !on-connect(IO::Socket::Async $socket) {
 }
 
 multi method close(--> Bool) {
-    $!socket.close;
     $!connections.done;
+    $!socket.close;
 }
 
 =begin pod
 
 =head1 NAME
 
-Net::Telnet::Server - Telnet server library
+Net::Telnet::Server
 
 =head1 DESCRIPTION
 
-Net::Telnet::Server is a library for creating Telnet servers.
+C<Net::Telnet::Server> is a class that creates TELNET servers.
 
 =head1 SYNOPSIS
 
@@ -86,6 +86,10 @@ Net::Telnet::Server is a library for creating Telnet servers.
 
             LAST {
                 # Server was closed; clean up if necessary.
+            }
+
+            QUIT {
+                # Handle exceptions.
             }
         }
         whenever signal(SIGINT) {
@@ -125,7 +129,8 @@ Initializes a new C<Net::Telnet::Server> instance.
 
 Begins listening for connections given the host and port the server was
 initialized with. This returns a C<Supply> that emits
-C<Net::Telnet::Server::Connection> instances.
+C<Net::Telnet::Server::Connection> instances. See the documentation on
+C<Net::Telnet::Connection> for more information.
 
 =item B<close>(--> Bool)
 

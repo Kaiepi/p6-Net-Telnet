@@ -26,7 +26,6 @@ has IO::Socket::Async $.socket;
 
 has Str      $.host;
 has Int      $.port;
-has Promise  $.negotiated    .= new;
 has Promise  $.close-promise .= new;
 has Supplier $!text          .= new;
 has Supplier $!binary        .= new;
@@ -85,7 +84,7 @@ method new(
     self.bless: :$host, :$port, :$options, :@supported, :@preferred, |%args;
 }
 
-method !on-connect(IO::Socket::Async $!socket --> Nil) {
+method !on-connect(IO::Socket::Async $!socket) {
     $!socket.Supply(:bin).tap(-> $data {
         self!parse: $data;
     }, done => {
@@ -111,6 +110,8 @@ method !on-connect(IO::Socket::Async $!socket --> Nil) {
     });
 
     self!send-initial-negotiations;
+
+    self
 }
 
 method !send-initial-negotiations(--> Nil) {
@@ -132,8 +133,6 @@ method !send-initial-negotiations(--> Nil) {
             }
         }
     }
-
-    $!negotiated.keep;
 }
 
 method !on-close(--> Nil) {
@@ -304,9 +303,11 @@ method !send-subnegotiation(TelnetOption $option --> Promise) {
                 width  => $!host-width,
                 height => $!host-height
         }
-        default { Nil }
+        default {
+            Nil
+        }
     };
-    return start { 0 } unless $subnegotiation.defined;
+    return Promise.start({ 0 }) unless $subnegotiation.defined;
 
     self.send: $subnegotiation.serialize
 }
@@ -314,3 +315,133 @@ method !send-subnegotiation(TelnetOption $option --> Promise) {
 method close(--> Bool) {
     $!socket.close
 }
+
+=begin pod
+
+=head1 NAME
+
+Net::Telnet::Connection
+
+=head1 DESCRIPTION
+
+Net::Telnet::Connection is a role done by Net::Telnet::Client and
+Net::Telnet::Server::Connection. It manages all connection state.
+
+=head1 ATTRIBUTES
+
+=item IO::Socket::Async B<$.socket>
+
+The connection's socket.
+
+=item Str B<$.host>
+
+The host with which the connection will connect.
+
+=item Int B<$.port>
+
+The port with which the connection will connect.
+
+=item Promise B<$.close-promise>
+
+This promise is kept once the connection is closed.
+
+=item Map B<$.options>
+
+A map of the state of all options the connection is aware of. Its shape is
+C«(Net::Telnet::Constants::TelnetOption => Net::Telnet::Option)».
+
+=item Int B<$.peer-width>
+
+The peer's terminal width. This is meaningless for Net::Telnet::Client since
+C<NAWS> is only supported by clients.
+
+=item Int B<$.peer-height>
+
+The peer's terminal height. This is meaningless for Net::Telnet::Client since
+C<NAWS> is only supported by clients.
+
+=item Int B<$.host-width>
+
+The host's terminal width. This is meaningless for
+Net::Telnet::Server::Connection since C<NAWS> is only supported by clients.
+
+=item Int B<$.host-height>
+
+The host's terminal height. This is meaningless for
+Net::Telnet::Server::Connection since C<NAWS> is only supported by clients.
+
+=head1 METHODS
+
+=item B<closed>(--> Bool)
+
+Whether or not the connection is currently closed.
+
+=item B<text>(--> Supply)
+
+Returns the supply to which text received by the connection is emitted.
+
+=item B<binary>(--> Supply)
+
+Returns the supply to which supplies that emit binary data received by the
+connection is emitted.
+
+=item B<supported>(Str $option --> Bool)
+
+Returns whether or not C<$option> is allowed to be enabled by the peer.
+
+=item B<preferred>(Str $option --> Bool)
+
+Returns whether or not C<$option> is allowed to be enabled by us.
+
+=item B<new>(Str I<:$host>, Int I<:$port>, I<:@supported?>, I<:@preferred?> --> Net::Telnet::Client)
+
+Initializes a TELNET connection. C<$host> and C<$port> are used by C<.connect> to
+connect to a peer.
+
+C<@supported> is a list of options that the connection will allow the peer to
+negotiate with. On connect, C«DO» negotiations will be sent for each option in
+this list as part of the connection's initial negotiations, unless this is a
+Net::Telnet::Client instance and the peer has already sent a C«WILL»
+negotiation.
+
+C<@preferred> is a list of options that the connection will attempt to
+negotiate with. On connect, C«IAC WILL» commands will be sent for each option
+in this list as part of the connection's initial negotiations, unless this is a
+Net::Telnet::Client instance and the peer has already sent a C«DO» negotiation.
+
+=item B<connect>(--> Promise)
+
+Connects to the peer given the host and port provided in C<new>. The promise
+returned is resolved once the connection has been opened.
+
+C<X::Net::Telnet::ProtocolViolation> may be thrown at any time if the peer is
+either buggy, malicious, or not a TELNET server to begin with and doesn't
+follow TELNET protocol.
+
+C<X::Net::Telnet::OptionRace> may be thrown at any time if the peer is buggy
+or malicious and attempts to start a negotiation before another negotiation for
+the same option has finished. It may also be thrown if there is a race
+condition somewhere in negotiation handling.
+
+=item B<send>(Blob I<$data> --> Promise)
+=item B<send>(Str I<$data> --> Promise)
+
+Sends raw data to the server.
+
+=item B<send-text>(Str I<$data> --> Promise)
+
+Sends a message appended with C<CRLF> to the server.
+
+=item B<send-binary>(Blob I<$data> --> Promise)
+
+Sends binary data to the server. If the server isn't already expecting binary
+data, this will send the necessary C<TRANSMIT_BINARY> negotiations to attempt to
+convince the server to parse incoming data as binary data. This will throw
+C<X::Net::Telnet::TransmitBinary> if the server declines to begin binary data
+transmission.
+
+=item B<close>(--> Bool)
+
+Closes the connection to the server, if any is open.
+
+=end pod

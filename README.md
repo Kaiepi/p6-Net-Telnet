@@ -3,7 +3,7 @@
 NAME
 ====
 
-Net::Telnet - Telnet library for clients and servers
+Net::Telnet - TELNET library for clients and servers
 
 SYNOPSIS
 ========
@@ -17,8 +17,8 @@ SYNOPSIS
         :preferred[NAWS],
         :supported[SGA, ECHO];
     $client.text.tap({ .print });
+
     await $client.connect;
-    await $client.negotiated;
     await $client.send-text: 'cowsay ayy lmao';
     $client.close;
 
@@ -52,7 +52,21 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-Net::Telnet is a library for creating Telnet clients and servers. See `Net::Telnet::Client` and `Net::Telnet::Server` for more documentation.
+`Net::Telnet` is a library for creating TELNET clients and servers.
+
+Before you get started, read the documentation in the `docs` directory and read the example code in the `examples` directory.
+
+If you are using `Net::Telnet::Client` and don't know what options the server will attempt to negotiate with, run `bin/p6telnet-grep-options` using the server's host and port to grep the list of options it attempts to negotiate with when you first connect to it.
+
+The following options are currently supported:
+
+  * TRANSMIT_BINARY
+
+  * SGA
+
+  * ECHO
+
+  * NAWS
 
 AUTHOR
 ======

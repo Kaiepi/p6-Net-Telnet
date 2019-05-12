@@ -7,11 +7,10 @@ unit class Net::Telnet::Client does Net::Telnet::Connection;
 method connect(--> Promise) {
     IO::Socket::Async.connect($!host, $!port, :enc<latin1>).then(-> $p {
         self!on-connect: $p.result;
-        self
     })
 }
 
-method !send-initial-negotiations {
+method !send-initial-negotiations() {
     # Wait for the server to send its initial negotiations before sending our
     # own. This is to avoid race conditions.
     sleep 3;
@@ -22,6 +21,10 @@ method !send-initial-negotiations {
     # TODO: handle subnegotiations properly. This doesn't matter for now since
     # NAWS doesn't expect a response and it's the only option we support with
     # subnegotiations.
+    for $!pending.subnegotiations.kv -> $option, $request {
+        # await $request;
+        $!pending.subnegotiations.remove: $option;
+    }
 
     for $!options.values -> $option {
         if $option.preferred && $option.disabled: :local {
@@ -41,19 +44,19 @@ method !send-initial-negotiations {
             }
         }
     }
-
-    $!negotiated.keep;
 }
 
 =begin pod
 
 =head1 NAME
 
-Net::Telnet::Client - Telnet client library
+Net::Telnet::Client
 
 =head1 DESCRIPTION
 
-Net::Telnet::Client is a library for creating Telnet clients.
+C<Net::Telnet::Client> is a class that creates TELNET clients. For documentation
+on the majority of its attributes and methods, see the documentation on
+C<Net::Telnet::Connection>.
 
 =head1 SYNOPSIS
 
@@ -65,126 +68,16 @@ Net::Telnet::Client is a library for creating Telnet clients.
         :preferred[NAWS],
         :supported[ECHO, SGA];
     $client.text.tap({ .print });
+
     await $client.connect;
-    await $client.negotiated;
     await $client.send("cowsay ayy lmao\r\n");
     $client.close;
 
-=head1 ATTRIBUTES
-
-=item IO::Socket::Async B<$.socket>
-
-The client's socket.
-
-=item Str B<$.host>
-
-The host with which the client will connect.
-
-=item Int B<$.port>
-
-The port with which the client will connect.
-
-=item Promise B<$.negotiated>
-
-This promise is kept once the connection finishes sending its initial negotiations.
-
-=item Promise B<$.close-promise>
-
-This promise is kept once the connection is closed.
-
-=item Map B<$.options>
-
-A map of the state of all options the client is aware of. Its shape is
-C«(Net::Telnet::Constants::TelnetOption => Net::Telnet::Option)».
-
-=item Int B<$.peer-width>
-
-The server's terminal width. This is meaningless since C<NAWS> is only
-supported by the client.
-
-=item Int B<$.peer-height>
-
-The server's terminal height. This is meaningless since C<NAWS> is only
-supported by the client.
-
-=item Int B<$.host-width>
-
-The client's terminal width.
-
-=item Int B<$.host-height>
-
-The client's terminal height.
-
 =head1 METHODS
-
-=item B<closed>(--> Bool)
-
-Whether or not the connection is currently closed.
-
-=item B<text>(--> Supply)
-
-Returns the supply to which text received by the client is emitted.
-
-=item B<binary>(--> Supply)
-
-Returns the supply to which supplies that emit binary data received by the
-client is emitted.
-
-=item B<supported>(Str $option --> Bool)
-
-Returns whether the option C<$option> is allowed to be enabled by the opposite
-end of the connection.
-
-=item B<preferred>(Str $option --> Bool)
-
-Returns whether C<$option> is allowed to be enabled by this end of the
-connection.
-
-=item B<new>(Str I<:$host>, Int I<:$port>, I<:@supported?>, I<:@preferred?> --> Net::Telnet::Client)
-
-Initializes a Telnet client. C<$host> and C<$port> are used by C<.connect> to
-connect to a server. C<@supported> is an array of options of which the client
-will allow the server to negotiate with, while C<@preferred> is an array of
-options of which the client I<will> negotiate with the server with. Both are not
-required, but should preferably be included.
 
 =item B<connect>(--> Promise)
 
-Connects the client to a server given the host and port provided in C<.new>.
-The promise returned is resolved once the connection has begun.
-
-C<X::Net::Telnet::ProtocolViolation> may be thrown at any time if the server is
-either buggy, malicious, or not a TELNET server to begin with and doesn't
-follow TELNET protocol.
-
-C<X::Net::Telnet::OptionRace> may be thrown at any time if the server is buggy
-or malicious and attempts to start a negotiation before another negotiation for
-the same option has finished. It may also be thrown if there is a race
-condition in negotiation handling.
-
-=item B<send>(Blob I<$data> --> Promise)
-=item B<send>(Str I<$data> --> Promise)
-
-Sends raw data to the server.
-
-=item B<send-text>(Str I<$data> --> Promise)
-
-Sends a message appended with C<CRLF> to the server.
-
-=item B<send-binary>(Blob I<$data> --> Promise)
-
-Sends binary data to the server. If the server isn't already expecting binary
-data, this will send the necessary C<TRANSMIT_BINARY> negotiations to attempt to
-convince the server to parse incoming data as binary data. This will throw
-C<X::Net::Telnet::TransmitBinary> if the server declines to begin binary data
-transmission.
-
-=item B<parse>(Blob I<$data>)
-
-Parses messages received from the server.
-
-=item B<close>(--> Bool)
-
-Closes the connection to the server, if any is open.
+Connects to the server. The promise returned is resolved once the initial
+negotiations with the server have been completed.
 
 =end pod
