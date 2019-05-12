@@ -158,15 +158,12 @@ method !parse(Blob $incoming --> Nil) {
     for $match.ast -> $chunk {
         given $chunk {
             when Net::Telnet::Command {
-                say '[RECV] ', $chunk;
                 self!parse-command: $chunk;
             }
             when Net::Telnet::Negotiation {
-                say '[RECV] ', $chunk;
                 self!parse-negotiation: $chunk;
             }
             when Net::Telnet::Subnegotiation {
-                say '[RECV] ', $chunk;
                 self!parse-subnegotiation: $chunk;
             }
             when Str {
@@ -285,7 +282,6 @@ method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promis
     $!pending.negotiations.request: $option;
 
     my Net::Telnet::Negotiation $negotiation .= new: :$command, :$option;
-    say '[SEND] ', $negotiation;
     self.send: $negotiation.serialize
 }
 
@@ -302,7 +298,6 @@ method !send-subnegotiation(TelnetOption $option --> Promise) {
     };
     return start { 0 } unless $subnegotiation.defined;
 
-    say '[SEND] ', $subnegotiation;
     self.send: $subnegotiation.serialize
 }
 
