@@ -31,9 +31,10 @@ method new(
 }
 
 method listen(--> Supply) {
-    $!socket = IO::Socket::Async.listen($!host, $!port, :enc<latin1>).tap(-> $socket {
-        self!on-connect: $socket;
+    $!socket = IO::Socket::Async.listen($!host, $!port, :enc<latin1>).tap(-> $connection {
+        self!on-connect: $connection;
     });
+    $!port = await $!socket.socket-port if $!port == 0;
     $!connections.Supply
 }
 
@@ -71,13 +72,12 @@ Net::Telnet::Server is a library for creating Telnet servers.
         :host<localhost>,
         :preferred<SGA ECHO>,
         :supported<NAWS>;
-    $server.listen;
 
     react {
-        whenever $server.connections -> $conn {
-            $conn.text.tap(-> $text {
-                say "$conn.host:$conn.port sent '$text'";
-                $conn.close;
+        whenever $server.listen -> $connection {
+            $connection.text.tap(-> $text {
+                say "Received: $text";
+                $connection.close;
             }, done => {
                 # Connection was closed; clean up if necessary.
             });
@@ -117,10 +117,6 @@ names can be found in C<Net::Telnet::Constants::TelnetOption>.
 
 =head1 METHODS
 
-=item B<connections>(--> Supply)
-
-This returns C<$!connections.Supply>.
-
 =item B<new>(Str I<:$host>, Int I<:$port>, Str I<:@preferred>, Str I<:@supported>)
 
 Initializes a new C<Net::Telnet::Server> instance.
@@ -128,7 +124,8 @@ Initializes a new C<Net::Telnet::Server> instance.
 =item B<listen>(--> Supply)
 
 Begins listening for connections given the host and port the server was
-initialized with. This returns C<$!connections.Supply>.
+initialized with. This returns a C<Supply> that emits
+C<Net::Telnet::Server::Connection> instances.
 
 =item B<close>(--> Bool)
 
