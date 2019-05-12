@@ -65,7 +65,9 @@ Net::Telnet::Client is a library for creating Telnet clients.
         :supported<ECHO SGA>;
     $client.text.tap({ .print });
     await $client.connect;
+    await $client.negotiated;
     await $client.send("cowsay ayy lmao\r\n");
+    $client.close;
 
 =head1 ATTRIBUTES
 
@@ -92,15 +94,17 @@ This promise is kept once the connection is closed.
 =item Map B<$.options>
 
 A map of the state of all options the client is aware of. Its shape is
-C«(Net::Telnet::Chunk::TelnetOption => Net::Telnet::Option)».
+C«(Net::Telnet::Constants::TelnetOption => Net::Telnet::Option)».
 
 =item Int B<$.peer-width>
 
-The server's terminal width.
+The server's terminal width. This is meaningless since C<NAWS> is only
+supported by the client.
 
 =item Int B<$.peer-height>
 
-The server's terminal height.
+The server's terminal height. This is meaningless since C<NAWS> is only
+supported by the client.
 
 =item Int B<$.host-width>
 
@@ -122,8 +126,8 @@ Returns the supply to which text received by the client is emitted.
 
 =item B<binary>(--> Supply)
 
-Returns the supply to which chunks of binary data received by the client are
-emitted.
+Returns the supply to which supplies that emit binary data received by the
+client is emitted.
 
 =item B<supported>(Str $option --> Bool)
 
@@ -135,18 +139,27 @@ end of the connection.
 Returns whether C<$option> is allowed to be enabled by this end of the
 connection.
 
-=item B<new>(Str :$host, Int :$port, :@supported?, :@preferred? --> Net::Telnet::Client)
+=item B<new>(Str I<:$host>, Int I<:$port>, I<:@supported?>, I<:@preferred?> --> Net::Telnet::Client)
 
 Initializes a Telnet client. C<$host> and C<$port> are used by C<.connect> to
 connect to a server. C<@supported> is an array of options of which the client
 will allow the server to negotiate with, while C<@preferred> is an array of
 options of which the client I<will> negotiate with the server with. Both are not
-required, but should preferrably be included.
+required, but should preferably be included.
 
 =item B<connect>(--> Promise)
 
 Connects the client to a server given the host and port provided in C<.new>.
 The promise returned is resolved once the connection has begun.
+
+C<X::Net::Telnet::ProtocolViolation> may be thrown at any time if the server is
+either buggy, malicious, or not a TELNET server to begin with and doesn't
+follow TELNET protocol.
+
+C<X::Net::Telnet::OptionRace> may be thrown at any time if the server is buggy
+or malicious and attempts to start a negotiation before another negotiation for
+the same option has finished. It may also be thrown if there is a race
+condition in negotiation handling.
 
 =item B<send>(Blob I<$data> --> Promise)
 =item B<send>(Str I<$data> --> Promise)
@@ -160,7 +173,7 @@ Sends a message appended with C<CRLF> to the server.
 =item B<send-binary>(Blob I<$data> --> Promise)
 
 Sends binary data to the server. If the server isn't already expecting binary
-data, this will send the necessary TRANSMIT_BINARY negotiations to attempt to
+data, this will send the necessary C<TRANSMIT_BINARY> negotiations to attempt to
 convince the server to parse incoming data as binary data. This will throw
 C<X::Net::Telnet::TransmitBinary> if the server declines to begin binary data
 transmission.
