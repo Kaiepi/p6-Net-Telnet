@@ -105,7 +105,7 @@ method !on-connect(IO::Socket::Async $!socket --> Nil) {
         $!host-height = Net::Telnet::Terminal.height;
         if $!options{NAWS}.enabled: :local {
             await self!send-subnegotiation(NAWS);
-            await $!pending.subnegotiations{NAWS};
+            await $!pending.subnegotiations.get: NAWS;
             $!pending.subnegotiations.remove: NAWS;
         }
     });
@@ -119,7 +119,7 @@ method !send-initial-negotiations(--> Nil) {
             my TelnetCommand $command = $option.on-send-will;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
-                await $!pending.negotiations{$option.option};
+                await $!pending.negotiations.get: $option.option;
                 $!pending.negotiations.remove: $option.option;
             }
         }
@@ -127,7 +127,7 @@ method !send-initial-negotiations(--> Nil) {
             my TelnetCommand $command = $option.on-send-do;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
-                await $!pending.negotiations{$option.option};
+                await $!pending.negotiations.get: $option.option;
                 $!pending.negotiations.remove: $option.option;
             }
         }
@@ -254,12 +254,19 @@ method send-text(Str $data --> Promise) {
 
 method send-binary(Blob $data --> Promise) {
     start {
-        unless $!options{TRANSMIT_BINARY}.enabled: :remote {
-            my TelnetCommand $res = await $!pending.negotiations.remove: TRANSMIT_BINARY;
-            if $res ne DO {
+        if $!options{TRANSMIT_BINARY}.disabled: :remote {
+            my Net::Telnet::Negotiation $negotiation = await $!pending.negotiations.get: TRANSMIT_BINARY;
+            my TelnetCommand            $command     = $negotiation.command;
+            $!pending.negotiations.remove: TRANSMIT_BINARY;
+
+            if $command ne DO {
                 await self!send-negotiation: WILL, TRANSMIT_BINARY;
-                temp $res = await $!pending.negotiations.remove: TRANSMIT_BINARY;
-                X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw unless $res eq DO;
+                temp $command = await $!pending.negotiations.get: TRANSMIT_BINARY;
+                $!pending.negotiations.remove: TRANSMIT_BINARY;
+
+                if $command ne DO {
+                    X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw;
+                }
             }
         }
 

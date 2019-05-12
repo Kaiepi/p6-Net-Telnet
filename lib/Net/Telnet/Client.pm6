@@ -28,6 +28,7 @@ method !send-initial-negotiations {
             my TelnetCommand $command = $option.on-send-will;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
+                await $!pending.negotiations.get: $option.option;
                 $!pending.negotiations.remove: $option.option;
             }
         }
@@ -35,6 +36,7 @@ method !send-initial-negotiations {
             my TelnetCommand $command = $option.on-send-do;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
+                await $!pending.negotiations.get: $option.option;
                 $!pending.negotiations.remove: $option.option;
             }
         }
