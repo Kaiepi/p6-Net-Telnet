@@ -107,8 +107,9 @@ my Int $port = 8080;
 }
 
 {
-    my Blob    $in .= new: 1,2,3;
-    my Promise $p  .= new;
+    my Blob    $in  .= new: 1, 2, 3;
+    my Blob    $out .= new;
+    my Promise $p   .= new;
 
     my Net::Telnet::Server $server .= new:
         :$host,
@@ -120,8 +121,11 @@ my Int $port = 8080;
         :supported<TRANSMIT_BINARY>;
 
     $server.listen.tap(-> $connection {
-        my Blob $out .= new;
-        $connection.binary.tap(-> $data {
+        await $connection.send-binary: $in;
+    });
+
+    $client.binary.tap(-> $supply {
+        $supply.tap(-> $data {
             $out ~= $data;
         }, done => {
             cmp-ok $out, 'eqv', $in, 'Can receive binary transmissions when TRANSMIT_BINARY is set as a preferred option';
@@ -131,9 +135,8 @@ my Int $port = 8080;
 
     await $client.connect;
     await $client.negotiated;
-    await $client.send-binary: $in;
-    $client.close;
     await $p;
+    $client.close;
     $server.close;
 }
 

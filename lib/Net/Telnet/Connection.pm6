@@ -30,6 +30,7 @@ has Promise  $.negotiated    .= new;
 has Promise  $.close-promise .= new;
 has Supplier $!text          .= new;
 has Supplier $!binary        .= new;
+has Supplier $!current-binary;
 
 has Net::Telnet::Pending $.pending .= new;
 
@@ -195,6 +196,25 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Nil) {
         when WILL { $option.on-receive-will }
         when WONT { $option.on-receive-wont }
     }
+
+    # Handle binary transmissions.
+    if $negotiation.option eq TRANSMIT_BINARY {
+        given $negotiation.command {
+            when WILL {
+                if $option.enabled: :remote {
+                    $!current-binary .= new;
+                    $!binary.emit: $!current-binary.Supply;
+                }
+            }
+            when WONT {
+                if $option.disabled: :remote {
+                    $!current-binary.done;
+                }
+            }
+        }
+    }
+
+    # We must have a response from here on out.
     return unless $command.defined;
 
     # Send our response(s).
@@ -228,7 +248,7 @@ method !parse-text(Str $data --> Nil) {
 }
 
 method !parse-blob(Blob $data --> Nil) {
-    $!binary.emit: $data;
+    $!current-binary.emit: $data;
 }
 
 proto method send($ --> Promise) {*}
@@ -247,7 +267,7 @@ method send-text(Str $data --> Promise) {
 
 method send-binary(Blob $data --> Promise) {
     start {
-        if $!options{TRANSMIT_BINARY}.disabled: :remote {
+        if $!options{TRANSMIT_BINARY}.disabled: :local {
             my Net::Telnet::Negotiation $negotiation;
 
             await self!send-negotiation: WILL, TRANSMIT_BINARY;
@@ -263,7 +283,6 @@ method send-binary(Blob $data --> Promise) {
             $^b == 0xFF ?? (|$^a, $^b, $^b) !! (|$^a, $^b)
         });
 
-        await self!send-negotiation: DO, TRANSMIT_BINARY;
         await self.send: $escaped-data;
         await self!send-negotiation: WONT, TRANSMIT_BINARY;
     }
