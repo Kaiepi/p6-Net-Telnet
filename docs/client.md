@@ -21,7 +21,7 @@ SYNOPSIS
     $client.text.tap({ .print });
 
     await $client.connect;
-    await $client.send("cowsay ayy lmao\r\n");
+    await $client.send-text: 'cowsay ayy lmao';
     $client.close;
 
 METHODS
