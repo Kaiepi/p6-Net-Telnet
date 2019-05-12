@@ -253,18 +253,14 @@ method send-text(Str $data --> Promise) {
 method send-binary(Blob $data --> Promise) {
     start {
         if $!options{TRANSMIT_BINARY}.disabled: :remote {
-            my Net::Telnet::Negotiation $negotiation = await $!pending.negotiations.get: TRANSMIT_BINARY;
-            my TelnetCommand            $command     = $negotiation.command;
+            my Net::Telnet::Negotiation $negotiation;
+
+            await self!send-negotiation: WILL, TRANSMIT_BINARY;
+            $negotiation = await $!pending.negotiations.get: TRANSMIT_BINARY;
             $!pending.negotiations.remove: TRANSMIT_BINARY;
 
-            if $command ne DO {
-                await self!send-negotiation: WILL, TRANSMIT_BINARY;
-                temp $command = await $!pending.negotiations.get: TRANSMIT_BINARY;
-                $!pending.negotiations.remove: TRANSMIT_BINARY;
-
-                if $command ne DO {
-                    X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw;
-                }
+            if $negotiation.command ne DO {
+                X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw;
             }
         }
 
