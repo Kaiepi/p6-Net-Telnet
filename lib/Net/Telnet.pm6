@@ -10,12 +10,13 @@ Net::Telnet - Telnet library for clients and servers
 =head1 SYNOPSIS
 
     use Net::Telnet::Client;
+    use Net::Telnet::Constants;
     use Net::Telnet::Server;
 
     my Net::Telnet::Client $client .= new:
         :host<telehack.com>,
-        :preferred<NAWS>,
-        :supported<SGA ECHO>;
+        :preferred[NAWS],
+        :supported[SGA, ECHO];
     $client.text.tap({ .print });
     await $client.connect;
     await $client.negotiated;
@@ -24,8 +25,8 @@ Net::Telnet - Telnet library for clients and servers
 
     my Net::Telnet::Server $server .= new:
         :host<localhost>,
-        :preferred<SGA ECHO>,
-        :supported<NAWS>;
+        :preferred[SGA, ECHO],
+        :supported[NAWS];
 
     react {
         whenever $server.listen -> $connection {

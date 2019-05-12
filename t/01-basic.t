@@ -1,6 +1,6 @@
 use v6.d;
 use Net::Telnet::Client;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 use Net::Telnet::Exceptions;
 use Net::Telnet::Option;
 use Net::Telnet::Server;
@@ -17,13 +17,13 @@ my Int $port = 8080;
     my Net::Telnet::Server $server .= new:
         :$host,
         :$port,
-        :preferred<SGA>,
-        :supported<NAWS>;
+        :preferred[SGA],
+        :supported[NAWS];
     my Net::Telnet::Client $client .= new:
         :$host,
         :$port,
-        :preferred<NAWS>,
-        :supported<SGA>;
+        :preferred[NAWS],
+        :supported[SGA];
 
     $server.listen.tap(-> $connection {
         $connection.text.tap(done => {
@@ -46,8 +46,8 @@ my Int $port = 8080;
         is $connection.id, 0, 'First connection received has an ID of 0';
         is $connection.host, $server.host, 'Can receive connections on 127.0.0.1';
         isnt $connection.port, $server.host, 'Connections are received on a different port from the server';
-        ok $connection.preferred('SGA'), 'Can get server preferred options';
-        ok $connection.supported('NAWS'), 'Can get server supported options';
+        ok $connection.preferred(SGA), 'Can get server preferred options';
+        ok $connection.supported(NAWS), 'Can get server supported options';
         await $connection.send-text: 'ayy lmao';
     });
 
@@ -62,8 +62,8 @@ my Int $port = 8080;
 
     is $client.host, '127.0.0.1', 'Can get client host';
     is $client.port, $port, 'Can get client port';
-    ok $client.preferred('NAWS'), 'Can get client preferred options';
-    ok $client.supported('SGA'), 'Can get client supported options';
+    ok $client.preferred(NAWS), 'Can get client preferred options';
+    ok $client.supported(SGA), 'Can get client supported options';
 
     {
         my $option = $client.options{NAWS};
@@ -114,11 +114,11 @@ my Int $port = 8080;
     my Net::Telnet::Server $server .= new:
         :$host,
         :$port,
-        :preferred<TRANSMIT_BINARY>;
+        :preferred[TRANSMIT_BINARY];
     my Net::Telnet::Client $client .= new:
         :$host,
         :$port,
-        :supported<TRANSMIT_BINARY>;
+        :supported[TRANSMIT_BINARY];
 
     $server.listen.tap(-> $connection {
         await $connection.send-binary: $in;
@@ -146,11 +146,11 @@ my Int $port = 8080;
     my Net::Telnet::Server $server .= new:
         :$host,
         :$port,
-        :supported<ECHO>;
+        :supported[ECHO];
     my Net::Telnet::Client $client .= new:
         :$host,
         :$port,
-        :preferred<ECHO>;
+        :preferred[ECHO];
 
     $client.text.tap({
         pass 'Can receive text sent when ECHO is set as a preferred option';
@@ -160,13 +160,11 @@ my Int $port = 8080;
     $server.listen;
     await $client.connect;
     await $client.negotiated;
-    await $client.send: "If two astronauts were on the moon and one bashed the other's head in with a rock would that be fucked up or what?";
-
+    await $client.send-text: "If two astronauts were on the moon and one bashed the other's head in with a rock would that be fucked up or what?";
     await Promise.anyof(
         Promise.in(5).then({ flunk 'Can receive text sent when ECHO is set as a preferred option' }),
         $p
     );
-
     $client.close;
     $server.close;
 }

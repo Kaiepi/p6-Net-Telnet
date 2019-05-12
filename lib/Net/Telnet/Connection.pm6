@@ -2,7 +2,7 @@ use v6.d;
 use NativeCall;
 use Net::Telnet::Chunk;
 use Net::Telnet::Command;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 use Net::Telnet::Exceptions;
 use Net::Telnet::Negotiation;
 use Net::Telnet::Option;
@@ -34,9 +34,9 @@ has Supplier $!current-binary;
 
 has Net::Telnet::Pending $.pending .= new;
 
-has Map $.options;
-has Str @.preferred;
-has Str @.supported;
+has Map          $.options;
+has TelnetOption @.preferred;
+has TelnetOption @.supported;
 
 has Int $.host-width  = 0;
 has Int $.host-height = 0;
@@ -59,11 +59,11 @@ method binary(--> Supply) {
     $!binary.Supply
 }
 
-method supported(Str $option --> Bool) {
+method supported(TelnetOption $option --> Bool) {
     @!supported ∋ $option
 }
 
-method preferred(Str $option --> Bool) {
+method preferred(TelnetOption $option --> Bool) {
     @!preferred ∋ $option
 }
 
@@ -74,12 +74,12 @@ method new(
         :$supported = [],
         *%args
 ) {
-    my Str @preferred = |$preferred;
-    my Str @supported = |$supported;
+    my TelnetOption @preferred = |$preferred;
+    my TelnetOption @supported = |$supported;
     my Map $options  .= new: TelnetOption.enums.kv.map(-> $k, $v {
         my TelnetOption $option    = TelnetOption($v);
-        my Bool         $supported = @supported ∋ $k;
-        my Bool         $preferred = @preferred ∋ $k;
+        my Bool         $supported = @supported ∋ $option;
+        my Bool         $preferred = @preferred ∋ $option;
         $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred;
     });
     self.bless: :$host, :$port, :$options, :@supported, :@preferred, |%args;

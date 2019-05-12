@@ -1,5 +1,5 @@
 use v6.d;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 
 module Net::Telnet {
     role Subnegotiation {

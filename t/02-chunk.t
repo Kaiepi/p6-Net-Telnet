@@ -1,7 +1,7 @@
 use v6.d;
 use Net::Telnet::Chunk;
 use Net::Telnet::Command;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 use Net::Telnet::Negotiation;
 use Net::Telnet::Subnegotiation;
 use Test;

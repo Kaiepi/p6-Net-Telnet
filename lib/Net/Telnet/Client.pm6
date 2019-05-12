@@ -1,6 +1,6 @@
 use v6.d;
 use Net::Telnet::Connection;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 use Net::Telnet::Option;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
@@ -24,7 +24,7 @@ method !send-initial-negotiations {
     # subnegotiations.
 
     for $!options.values -> $option {
-        if $option.preferred && ($option.us == NO) && ($option.usq == EMPTY) {
+        if $option.preferred && $option.disabled: :local {
             my TelnetCommand $command = $option.on-send-will;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
@@ -32,7 +32,7 @@ method !send-initial-negotiations {
                 $!pending.negotiations.remove: $option.option;
             }
         }
-        if $option.supported && ($option.them == NO) && ($option.themq == EMPTY) {
+        if $option.supported && $option.disabled: :remote {
             my TelnetCommand $command = $option.on-send-do;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
@@ -58,11 +58,12 @@ Net::Telnet::Client is a library for creating Telnet clients.
 =head1 SYNOPSIS
 
     use Net::Telnet::Client;
+    use Net::Telnet::Constants;
 
     my Net::Telnet::Client $client .= new:
         :host<telehack.com>,
-        :preferred<NAWS>,
-        :supported<ECHO SGA>;
+        :preferred[NAWS],
+        :supported[ECHO, SGA];
     $client.text.tap({ .print });
     await $client.connect;
     await $client.negotiated;

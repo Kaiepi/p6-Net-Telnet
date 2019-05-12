@@ -1,5 +1,6 @@
 use v6.d;
 use Net::Telnet::Connection;
+use Net::Telnet::Constants :ALL;
 unit class Net::Telnet::Server;
 
 class Connection does Net::Telnet::Connection {
@@ -13,11 +14,11 @@ has IO::Socket::Async::ListenSocket $.socket;
 has Str $.host;
 has Int $.port;
 
+has TelnetOption @.preferred;
+has TelnetOption @.supported;
+
 has Supplier  $!connections         .= new;
 has atomicint $!next-connection-id;
-
-has Str @.preferred;
-has Str @.supported;
 
 method new(
     Str :$host      = 'localhost',
@@ -25,8 +26,8 @@ method new(
         :$preferred = [],
         :$supported = []
 ) {
-    my Str @preferred = |$preferred;
-    my Str @supported = |$supported;
+    my TelnetOption @preferred = |$preferred;
+    my TelnetOption @supported = |$supported;
     self.bless: :$host, :$port, :@preferred, :@supported;
 }
 
@@ -66,12 +67,13 @@ Net::Telnet::Server is a library for creating Telnet servers.
 
 =head1 SYNOPSIS
 
+    use Net::Telnet::Constants;
     use Net::Telnet::Server;
 
     my Net::Telnet::Server $server .= new:
         :host<localhost>,
-        :preferred<SGA ECHO>,
-        :supported<NAWS>;
+        :preferred[SGA, ECHO],
+        :supported[NAWS];
 
     react {
         whenever $server.listen -> $connection {
@@ -105,15 +107,13 @@ The server's hostname.
 
 The server's port.
 
-=item Net::Telnet::Option B<@.preferred>
+=item Net::Telnet::Constants::TelnetOption B<@.preferred>
 
-A list of option names to be enabled by the server. Valid option names can be
-found in C<Net::Telnet::Constants::TelnetOption>.
+A list of option names to be enabled by the server.
 
-=item Net::Telnet::Option B<@.supported>
+=item Net::Telnet::Constants::TelnetOption B<@.supported>
 
-A list of option names to be allowed to be enabled by the client. Valid option
-names can be found in C<Net::Telnet::Constants::TelnetOption>.
+A list of options to be allowed to be enabled by the client.
 
 =head1 METHODS
 

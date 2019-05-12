@@ -1,5 +1,5 @@
 use v6.d;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 unit module Net::Telnet::Exceptions;
 
 class X::Net::Telnet is Exception { }

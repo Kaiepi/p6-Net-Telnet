@@ -1,5 +1,5 @@
 use v6.d;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 unit class Net::Telnet::Option;
 
 # See RFC 1143

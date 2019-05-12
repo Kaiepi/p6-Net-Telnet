@@ -1,10 +1,10 @@
 use v6.d;
 unit module Net::Telnet::Constants;
 
-my subset UInt8  of Int is export where 0..0xFF;
-my subset UInt16 of Int is export where 0..0xFFFF;
+my subset UInt8  of Int is export(:ALL) where 0..0xFF;
+my subset UInt16 of Int is export(:ALL) where 0..0xFFFF;
 
-my enum TelnetCommand is export (
+my enum TelnetCommand is export(:ALL) (
     'SE'   => 0xF0.chr, # Negotiation End
     'NOP'  => 0xF1.chr, # No Operation
     'DM'   => 0xF2.chr, # Data Mark
@@ -80,4 +80,4 @@ my enum TelnetOption is export (
     'EXOPL'               => 0xFF.chr
 );
 
-my Set constant Subnegotiators is export .= new: NAWS;
+my Set constant SUBNEGOTIATORS is export(:ALL) .= new: NAWS;
