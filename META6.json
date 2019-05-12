@@ -24,7 +24,7 @@
 		"Net::Telnet::Terminal" : "lib/Net/Telnet/Terminal.pm6"
 	},
 	"resources" : [ ],
-	"source-url" : "git@github.com:Kaiepi/p6-Net-Telnet.git",
+	"source-url" : "https://github.com/Kaiepi/p6-Net-Telnet.git",
 	"tags" : [ "Net" ],
 	"test-depends" : [ ],
 	"version" : "0.0.1"
