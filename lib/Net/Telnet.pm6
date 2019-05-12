@@ -18,26 +18,30 @@ Net::Telnet - Telnet library for clients and servers
         :supported<SGA ECHO>;
     $client.text.tap({ .print });
     await $client.connect;
-    await $client.send("cowsay ayy lmao\r\n");
+    await $client.negotiated;
+    await $client.send-text: 'cowsay ayy lmao';
     $client.close;
 
     my Net::Telnet::Server $server .= new:
         :host<localhost>,
         :preferred<SGA ECHO>,
         :supported<NAWS>;
-    $server.listen;
 
     react {
-        whenever $server.connections -> $conn {
-            $conn.text.tap(-> $text {
-                say "$conn.host:$conn.port sent '$text'";
-                $conn.close;
+        whenever $server.listen -> $connection {
+            $connection.text.tap(-> $text {
+                say "{$connection.host}:{$connection.port} sent '$text'";
+                $connection.close;
             }, done => {
                 # Connection was closed; clean up if necessary.
             });
 
             LAST {
                 # Server was closed; clean up if necessary.
+            }
+
+            QUIT {
+                # Handle exceptions.
             }
         }
         whenever signal(SIGINT) {
@@ -52,7 +56,7 @@ C<Net::Telnet::Client> and C<Net::Telnet::Server> for more documentation.
 
 =head1 AUTHOR
 
-Ben Davies (kaiepi)
+Ben Davies (Kaiepi)
 
 =head1 COPYRIGHT AND LICENSE
 
