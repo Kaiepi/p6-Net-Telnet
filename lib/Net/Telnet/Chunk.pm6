@@ -2,8 +2,7 @@ use v6.d;
 use Net::Telnet::Command;
 use Net::Telnet::Constants;
 use Net::Telnet::Negotiation;
-use Net::Telnet::Subnegotiation::NAWS;
-use Net::Telnet::Subnegotiation::Unsupported;
+use Net::Telnet::Subnegotiation;
 unit module Net::Telnet::Chunk;
 
 # Whether or not the data the peer's sending should be parsed as binary data or
