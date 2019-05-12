@@ -82,20 +82,15 @@ class Storage {
         }
 
         method resolve(TValue $negotiation --> Request) {
-            my TelnetOption $option = $negotiation.option;
-            self.request: $option unless self.EXISTS-KEY: $option;
-
-            my Request $request = self.AT-KEY: $option;
+            my TelnetOption $option  = $negotiation.option;
+            my Request      $request = self.request: $option;
             $request.resolve: $negotiation;
             $request
         }
 
-        method remove(TelnetOption $option --> Request) {
-            return self!throw: $option unless self.EXISTS-KEY: $option;
-
-            my Request $request = self.AT-KEY: $option;
+        method remove(TelnetOption $option --> Nil) {
+            self!throw: $option unless self.EXISTS-KEY: $option;
             self.DELETE-KEY: $option;
-            $request
         }
 
         method !throw(TelnetOption $option) {

@@ -15,7 +15,10 @@ method !send-initial-negotiations {
     # Wait for the server to send its initial negotiations before sending our
     # own. This is to avoid race conditions.
     sleep 3;
-    await $!pending.negotiations.remove: $_ for $!pending.negotiations.keys;
+    for $!pending.negotiations.kv -> $option, $request {
+        await $request;
+        $!pending.negotiations.remove: $option;
+    }
     # TODO: handle subnegotiations properly. This doesn't matter for now since
     # NAWS doesn't expect a response and it's the only option we support with
     # subnegotiations.
