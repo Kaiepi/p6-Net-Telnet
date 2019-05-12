@@ -1,0 +1,40 @@
+use v6.d;
+use Net::Telnet::Chunk;
+use Net::Telnet::Constants;
+use Net::Telnet::Negotiation;
+
+sub MAIN(Str $host, Int $port = 23) {
+    say "Getting supported and preferred options for $host:$port...";
+
+    my IO::Socket::Async $client = await IO::Socket::Async.connect: $host, $port, :enc<latin1>;
+    my Str $data = '';
+    $client.Supply.tap(-> $message {
+        $data ~= $message;
+    });
+    sleep 3;
+    $client.close;
+
+    my Str @supported;
+    my Str @preferred;
+
+    my Net::Telnet::Chunk::Actions $actions .= new;
+    my Net::Telnet::Chunk::Grammar $match   .= subparse: $data, :$actions;
+
+    if $match.ast ~~ Nil {
+        note "$host does not appear to be a TELNET server.";
+        exit 1;
+    }
+
+    my Net::Telnet::Negotiation @negotiations = $match.ast.grep(* ~~ Net::Telnet::Negotiation);
+    for @negotiations -> $negotiation {
+        given $negotiation.command {
+            when DO   { @preferred.push: $negotiation.option.key }
+            when WILL { @supported.push: $negotiation.option.key }
+        }
+    }
+
+    say "Host:      $host";
+    say "Port:      $port";
+    say 'Supported: ' ~ @supported.join: ', ';
+    say 'Preferred: ' ~ @preferred.join: ', ';
+}
