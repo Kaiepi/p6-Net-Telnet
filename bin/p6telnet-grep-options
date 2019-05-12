@@ -1,6 +1,6 @@
 use v6.d;
 use Net::Telnet::Chunk;
-use Net::Telnet::Constants;
+use Net::Telnet::Constants :ALL;
 use Net::Telnet::Negotiation;
 
 sub MAIN(Str $host, Int $port = 23) {
@@ -38,3 +38,5 @@ sub MAIN(Str $host, Int $port = 23) {
     say 'Supported: ' ~ @supported.join: ', ';
     say 'Preferred: ' ~ @preferred.join: ', ';
 }
+
+# vim: ft=perl6 sw=4 ts=4 sts=4 expandtab
