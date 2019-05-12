@@ -20,7 +20,7 @@ sub MAIN(Str $host, Int $port = 23) {
     my Net::Telnet::Chunk::Actions $actions .= new;
     my Net::Telnet::Chunk::Grammar $match   .= subparse: $data, :$actions;
 
-    if $match.ast ~~ Nil {
+    if $match.ast === Nil {
         note "$host does not appear to be a TELNET server.";
         exit 1;
     }

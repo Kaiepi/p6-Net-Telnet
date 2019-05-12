@@ -7,10 +7,10 @@ class X::Net::Telnet is Exception { }
 class X::Net::Telnet::ProtocolViolation is X::Net::Telnet {
     has Str  $.host;
     has Int  $.port;
-    has Blob $.remainder;
+    has Blob $.data;
 
     method message(--> Str) {
-        my Str $bytes = $!remainder.map({ sprintf '%2x', $_ }).uc;
+        my Str $bytes = $!data.map({ sprintf '%02x', $_ }).join(' ').uc;
 
         qq:to/END/;
         Data received from $!host:$!port violates TELNET protocol:

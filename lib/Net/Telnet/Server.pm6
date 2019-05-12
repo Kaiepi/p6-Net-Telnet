@@ -31,7 +31,7 @@ method new(
 }
 
 method listen(--> Supply) {
-    $!socket = IO::Socket::Async.listen($!host, $!port).tap(-> $socket {
+    $!socket = IO::Socket::Async.listen($!host, $!port, :enc<latin1>).tap(-> $socket {
         self!on-connect: $socket;
     });
     $!connections.Supply

@@ -5,7 +5,7 @@ use Net::Telnet::Option;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
 method connect(--> Promise) {
-    IO::Socket::Async.connect($!host, $!port).then(-> $p {
+    IO::Socket::Async.connect($!host, $!port, :enc<latin1>).then(-> $p {
         self!on-connect: $p.result;
         self
     })

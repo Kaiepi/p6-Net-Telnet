@@ -43,9 +43,8 @@ has Int $.peer-width  = 0;
 has Int $.peer-height = 0;
 has Tap $!terminal;
 
-has Net::Telnet::Chunk::Actions $!actions        .= new;
-has atomicint                   $!failed-matches  = 0;
-has Blob                        $!remainder      .= new;
+has Net::Telnet::Chunk::Actions $!actions   .= new;
+has Blob                        $!remainder .= new;
 
 method closed(--> Bool) {
     $!close-promise.status ~~ Kept
@@ -149,10 +148,8 @@ method !parse(Blob $incoming --> Nil) {
     my Str                         $message  = $data.decode: 'latin1';
     my Net::Telnet::Chunk::Grammar $match   .= subparse: $message, :$!actions;
 
-    if $match.ast ~~ Nil && ++⚛$!failed-matches >= 3 {
-        X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$!remainder).throw;
-    } elsif ⚛$!failed-matches {
-        $!failed-matches ⚛= 0;
+    if $match.ast === Nil {
+        X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$data).throw;
     }
 
     for $match.ast -> $chunk {
@@ -175,9 +172,7 @@ method !parse(Blob $incoming --> Nil) {
         }
     }
 
-    if $match.ast ~~ Nil {
-        $!remainder ~= $data;
-    } elsif $match.postmatch {
+    if $match.postmatch {
         $!remainder ~= $match.postmatch.encode: 'latin1';
     } elsif $!remainder {
         $!remainder .= new;
