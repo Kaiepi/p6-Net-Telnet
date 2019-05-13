@@ -143,11 +143,11 @@ my Int $port = 8080;
     my Net::Telnet::Server $server .= new:
         :$host,
         :$port,
-        :supported[ECHO];
+        :preferred[ECHO];
     my Net::Telnet::Client $client .= new:
         :$host,
         :$port,
-        :preferred[ECHO];
+        :supported[ECHO];
 
     $client.text.tap({
         pass 'Can receive text sent when ECHO is set as a preferred option';
