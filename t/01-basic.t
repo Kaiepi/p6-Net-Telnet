@@ -6,7 +6,7 @@ use Net::Telnet::Option;
 use Net::Telnet::Server;
 use Test;
 
-plan 23;
+plan 24;
 
 my Str $host = '127.0.0.1';
 my Int $port = 8080;
@@ -158,9 +158,34 @@ my Int $port = 8080;
     await $client.connect;
     await $client.send-text: "If two astronauts were on the moon and one bashed the other's head in with a rock would that be fucked up or what?";
     await Promise.anyof(
-        Promise.in(5).then({ flunk 'Can receive text sent when ECHO is set as a preferred option' }),
+        Promise.in(5).then({
+            flunk 'Can receive text sent when ECHO is set as a supported option' unless $p.kept;
+        }),
         $p
     );
+    $client.close;
+    $server.close;
+}
+
+{
+    my Promise $p .= new;
+
+    my Net::Telnet::Server $server .= new:
+        :$host,
+        :$port,
+        :supported[TERMINAL_TYPE];
+    my Net::Telnet::Client $client .= new:
+        :$host,
+        :$port,
+        :preferred[TERMINAL_TYPE];
+
+    $server.listen.tap(-> $connection {
+        is $connection.terminal.type, $client.terminal.type, 'Can set connection terminal type when TERMINAL_TYPE is set as a preferred option';
+        $p.keep;
+    });
+
+    await $client.connect;
+    await $p;
     $client.close;
     $server.close;
 }

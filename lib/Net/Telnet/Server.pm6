@@ -1,15 +1,36 @@
 use v6.d;
 use Net::Telnet::Connection;
 use Net::Telnet::Constants :ALL;
+use Net::Telnet::Terminal;
 unit class Net::Telnet::Server;
 
 class Connection does Net::Telnet::Connection {
     trusts Net::Telnet::Server;
 
-    has Int $.id;
+    class Terminal does Net::Telnet::Terminal {
+        has Str $.type   is rw;
+        has Int $.width  is rw;
+        has Int $.height is rw;
 
-    # NAWS is only used by clients.
-    method !set-terminal-dimensions(--> Nil) {}
+        submethod BUILD() {
+            $!type   = 'unknown';
+            $!width  = 0;
+            $!height = 0;
+        }
+
+        submethod DESTROY() {}
+
+        # "Where are the width and height methods? Aren't they still stubbed?"
+        # Remember, the width and height attributes are public; they add
+        # methods implicitly.
+    }
+
+    # A unique identifier for this connection.
+    #
+    # It's not up to the library to keep track of connections after they've
+    # been emitted to the Supply returned by Net::Telnet::Server.listen. This
+    # allows you to do so yourself.
+    has Int $.id;
 
     method !send-initial-negotiations(--> Nil) {
         for $!options.values -> $option {
@@ -28,6 +49,47 @@ class Connection does Net::Telnet::Connection {
                     await $!pending.negotiations.get: $option.option;
                     $!pending.negotiations.remove: $option.option;
                 }
+            }
+        }
+
+        # Send "IAC SB TERMINAL_TYPE SEND IAC SE" and await a response from the
+        # client to set its terminal type.
+        if $!options{TERMINAL_TYPE}.enabled: :remote {
+            await self!send-subnegotiation: TERMINAL_TYPE;
+
+            my Net::Telnet::Subnegotiation::TerminalType $subnegotiation =
+                await $!pending.subnegotiations.get: TERMINAL_TYPE;
+            $!terminal.type = $subnegotiation.type;
+
+            $!pending.subnegotiations.remove: TERMINAL_TYPE;
+        }
+    }
+
+    method !update-host-state(Net::Telnet::Subnegotiation $subnegotiation --> Nil) {
+        given $subnegotiation.option {
+            when NAWS {
+                $!terminal.width  = $subnegotiation.width;
+                $!terminal.height = $subnegotiation.height;
+            }
+            when TERMINAL_TYPE {
+                if $subnegotiation.command != TerminalTypeCommand::IS {
+                    my Blob $data = $subnegotiation.serialize;
+                    X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$data).throw;
+                }
+                $!terminal.type = $subnegotiation.type;
+            }
+        }
+    }
+
+    method !update-peer-state(TelnetOption $option --> Net::Telnet::Subnegotiation) {
+        given $option {
+            when TERMINAL_TYPE {
+                Net::Telnet::Subnegotiation::TerminalType.new(
+                    command => TerminalTypeCommand::SEND
+                )
+            }
+            default {
+                Nil
             }
         }
     }
@@ -59,22 +121,25 @@ method listen(--> Supply) {
     $!socket = IO::Socket::Async.listen($!host, $!port, :enc<latin1>).tap(-> $connection {
         self!on-connect: $connection;
     });
+
     $!port = await $!socket.socket-port if $!port == 0;
+
     $!connections.Supply
 }
 
 method !on-connect(IO::Socket::Async $socket --> Nil) {
-    my Int $id   = $!next-connection-id⚛++;
-    my Str $host = $socket.peer-host;
-    my Int $port = $socket.peer-port;
-
-    my Connection $connection .= new: :$id, :$host, :$port, :@!preferred, :@!supported;
+    my Int                  $id          = $!next-connection-id⚛++;
+    my Str                  $host        = $socket.peer-host;
+    my Int                  $port        = $socket.peer-port;
+    my Connection::Terminal $terminal   .= new;
+    my Connection           $connection .= new:
+        :$id, :$host, :$port, :@!preferred, :@!supported, :$terminal;
     $connection!Connection::on-connect: $socket;
 
     $!connections.emit: $connection;
 }
 
-multi method close(--> Bool) {
+method close(--> Bool) {
     $!connections.done;
     $!socket.close;
 }

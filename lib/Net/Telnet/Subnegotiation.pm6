@@ -32,7 +32,8 @@ module Net::Telnet {
         has UInt16 $.height is required;
 
         method new(UInt16 :$width, UInt16 :$height) {
-            self.bless: :option(NAWS), :$width, :$height;
+            my TelnetOption $option = NAWS;
+            self.bless: :$option, :$width, :$height;
         }
 
         multi method gist(--> Str) {
@@ -49,12 +50,40 @@ module Net::Telnet {
         }
     }
 
+    class Subnegotiation::TerminalType does Subnegotiation {
+        has TerminalTypeCommand $.command;
+        has Str                 $.type;
+
+        method new(TerminalTypeCommand :$command, Str :$type) {
+            my TelnetOption $option = TERMINAL_TYPE;
+            self.bless: :$option, :$command, :$type;
+        }
+
+        multi method gist(--> Str) {
+            given $!command {
+                when TerminalTypeCommand::IS {
+                    "{$!command.key} $!type"
+                }
+                when TerminalTypeCommand::SEND {
+                    $!command.key
+                }
+            }
+        }
+
+        multi method serialize(--> Blob) {
+            given $!command {
+                when TerminalTypeCommand::IS {
+                    Blob.new: $!command.value, |$!type.encode: 'latin1'
+                }
+                when TerminalTypeCommand::SEND {
+                    Blob.new: $!command.value
+                }
+            }
+        }
+    }
+
     class Subnegotiation::Unsupported does Subnegotiation {
         has Blob $.bytes;
-
-        method new(TelnetOption :$option, Blob :$bytes) {
-            self.bless: :$option, :$bytes;
-        }
 
         multi method gist(--> Str) {
             $!bytes.map({ sprintf '%02x', $_ }).join(' ').uc

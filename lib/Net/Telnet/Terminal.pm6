@@ -1,70 +1,18 @@
 use v6.d;
-use NativeCall;
-unit module Net::Telnet::Terminal;
+unit role Net::Telnet::Terminal;
 
-# Windows
-class COORD is repr('CStruct') {
-    has int16 $.X;
-    has int16 $.Y;
-}
+# This library isn't concerned with terminal emulation. All we care about is
+# implementing the TELNET protocol. That said, there are some TELNET options
+# that require information about the system terminal. These are implemented in
+# Net::Telnet::Client::Terminal and Net::Telnet::Server;:Connection::Terminal.
+#
+# If you wish to implement proper terminal emulation, you'll need to wrap or
+# subclass Net::Telnet::Client and Net::Telnet::Client::Terminal and implement
+# the logic yourself. ncurses would be useful for this.
 
-class SMALL_RECT is repr('CStruct') {
-    has int16 $.Left;
-    has int16 $.Top;
-    has int16 $.Right;
-    has int16 $.Bottom;
-}
-
-class CONSOLE_SCREEN_BUFFER_INFO is repr('CStruct') {
-    HAS COORD      $.dwSize;
-    HAS COORD      $.dwCursorPosition;
-    has uint16     $.wAttributes;
-    HAS SMALL_RECT $.srWindow;
-    HAS COORD      $.dwMaximumWindowSize;
-}
-
-sub GetStdHandle(int32 --> Pointer[void]) is native {*}
-sub GetConsoleScreenBufferInfo(Pointer[void], CONSOLE_SCREEN_BUFFER_INFO is rw --> int32) is native {*}
-
-# POSIX
-class winsize is repr('CStruct') {
-    has uint16 $.ws_row;
-    has uint16 $.ws_col;
-    has uint16 $.ws_xpixel;
-    has uint16 $.ws_ypixel;
-}
-
-constant TIOCGWINSZ = do {
-    my Int constant IOCPARM_MASK = 0x1FFF;
-    my Int constant IOC_OUT      = 0x40000000;
-    my Int $group = 't'.ord;
-    my Int $num   = 104;
-    my Int $len   = nativesizeof(winsize);
-    IOC_OUT +| (($len +& IOCPARM_MASK) +< 16) +| ($group +< 8) +| $num
-};
-
-sub ioctl(int32, uint32, winsize is rw --> int32) is native {*}
-
-sub get-terminal-width(--> Int) is export {
-    if $*VM.osname eq 'MSWin32' {
-        my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
-        GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);
-        $csbi.srWindow.Right - $csbi.srWindow.Left + 1
-    } else {
-        my winsize $ws .= new;
-        ioctl($*OUT.native-descriptor, TIOCGWINSZ, $ws);
-        $ws.ws_col
-    }
-}
-
-sub get-terminal-height(--> Int) is export {
-    if $*VM.osname eq 'MSWin32' {
-        my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
-        GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);
-        $csbi.srWindow.Bottom - $csbi.srWindow.Top + 1
-    } else {
-        my winsize $ws .= new;
-        ioctl($*OUT.native-descriptor, TIOCGWINSZ, $ws);
-        $ws.ws_row
-    }
-}
+# Get/set the terminal type.
+method type(--> Str)   {...}
+# Get/set the terminal width.
+method width(--> Int)  {...}
+# Get/set the terminal height.
+method height(--> Int) {...}

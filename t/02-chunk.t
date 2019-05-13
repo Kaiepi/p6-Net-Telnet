@@ -6,7 +6,7 @@ use Net::Telnet::Negotiation;
 use Net::Telnet::Subnegotiation;
 use Test;
 
-plan 25;
+plan 39;
 
 my Net::Telnet::Chunk::Actions $actions .= new;
 
@@ -48,6 +48,30 @@ my Net::Telnet::Chunk::Actions $actions .= new;
     is $match.gist, 'IAC SB NAWS 255 255 IAC SE', 'Can make NAWS subnegotiations human-readable';
     is $match.serialize.decode('latin1'), $msg, 'Can serialize NAWS subnegotiations';
     is $match.Str, $msg, 'Can stringify NAWS subnegotiations';
+}
+
+{
+    my $msg = "{IAC}{SB}{TERMINAL_TYPE}\x[00]{'xterm'}{IAC}{SE}";
+    my $match = Net::Telnet::Chunk::Grammar.subparse($msg, :$actions, :rule<chunk>).ast;
+    cmp-ok $match, '~~', Net::Telnet::Subnegotiation::TerminalType, 'Can match TERMINAL_TYPE IS subnegotiations';
+    is $match.option, TERMINAL_TYPE, 'TERMINAL_TYPE IS subnegotiation has correct option';
+    is $match.command, TerminalTypeCommand::IS, 'TERMINAL_TYPE IS subnegotiation has correct command';
+    is $match.type, 'xterm', 'TERMINAL_TYPE IS subnegotiation has correct type';
+    is $match.gist, 'IAC SB TERMINAL_TYPE IS xterm IAC SE', 'Can make TERMINAL_TYPE IS subnegotiations human-readable';
+    is $match.serialize.decode('latin1'), $msg, 'Can serialize TERMINAL_TYPE IS subnegotiations';
+    is $match.Str, $msg, 'Can stringify TERMINAL_TYPE IS subnegotiations';
+}
+
+{
+    my $msg = "{IAC}{SB}{TERMINAL_TYPE}\x[01]{IAC}{SE}";
+    my $match = Net::Telnet::Chunk::Grammar.subparse($msg, :$actions, :rule<chunk>).ast;
+    cmp-ok $match, '~~', Net::Telnet::Subnegotiation::TerminalType, 'Can match TERMINAL_TYPE SEND subnegotiations';
+    is $match.option, TERMINAL_TYPE, 'TERMINAL_TYPE SEND subnegotiation has correct option';
+    is $match.command, TerminalTypeCommand::SEND, 'TERMINAL_TYPE SEND subnegotiation has correct option';
+    is $match.type, Str, 'TERMINAL_TYPE SEND subnegotiation has correct type';
+    is $match.gist, 'IAC SB TERMINAL_TYPE SEND IAC SE', 'Can make TERMINAL_TYPE SEND subnegotiations human-readable';
+    is $match.serialize.decode('latin1'), $msg, 'Can serialize TERMINAL_TYPE SEND subnegotiations';
+    is $match.Str, $msg, 'Can stringify TERMINAL_TYPE SEND subnegotiations';
 }
 
 {

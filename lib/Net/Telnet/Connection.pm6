@@ -8,6 +8,7 @@ use Net::Telnet::Negotiation;
 use Net::Telnet::Option;
 use Net::Telnet::Pending;
 use Net::Telnet::Subnegotiation;
+use Net::Telnet::Terminal;
 unit role Net::Telnet::Connection;
 
 my Int constant SO_OOBINLINE = do given $*VM.osname {
@@ -30,20 +31,15 @@ has Supplier $!text          .= new;
 has Supplier $!binary        .= new;
 has Supplier $!current-binary;
 
-has Net::Telnet::Pending $.pending .= new;
-
-has Map          $.options;
-has TelnetOption @.preferred;
-has TelnetOption @.supported;
-
-has Int $.host-width  = 0;
-has Int $.host-height = 0;
-has Int $.peer-width  = 0;
-has Int $.peer-height = 0;
-has Tap $!terminal;
-
 has Net::Telnet::Chunk::Actions $!actions   .= new;
 has Blob                        $!remainder .= new;
+
+has Map                  $.options;
+has TelnetOption         @.preferred;
+has TelnetOption         @.supported;
+has Net::Telnet::Pending $.pending    .= new;
+
+has Net::Telnet::Terminal $.terminal;
 
 method closed(--> Bool) {
     $!close-promise.status ~~ Kept
@@ -96,14 +92,10 @@ method !on-connect(IO::Socket::Async $!socket) {
         setsockopt($fd, SOL_SOCKET, SO_OOBINLINE, $optval, nativesizeof(int32));
     }
 
-    self!set-terminal-dimensions;
-
     self!send-initial-negotiations;
 
     self
 }
-
-method !set-terminal-dimensions(--> Nil) {...}
 
 method !send-initial-negotiations(--> Nil) {...}
 
@@ -112,7 +104,7 @@ method !on-close(--> Nil) {
     $!remainder .= new;
     $!text.done;
     $!binary.done;
-    $!terminal.close if $!terminal.defined;
+    $!terminal.DESTROY;
 }
 
 method !parse(Blob $incoming --> Nil) {
@@ -160,8 +152,8 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Nil) {
     $!pending.negotiations.resolve: $negotiation;
 
     # Update our option state.
-    my Net::Telnet::Option $option  = $!options{$negotiation.option};
-    my TelnetCommand       $command = do given $negotiation.command {
+    my Net::Telnet::Option $option = $!options{$negotiation.option};
+    my TelnetCommand $command = do given $negotiation.command {
         when DO   { $option.on-receive-do   }
         when DONT { $option.on-receive-dont }
         when WILL { $option.on-receive-will }
@@ -185,7 +177,7 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Nil) {
         }
     }
 
-    # We must have a response from here on out.
+    # We must have a response in order to continue.
     return unless $command.defined;
 
     # Send our response(s).
@@ -204,14 +196,11 @@ method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation --> Nil
     # Resolve the pending subnegotiation, if any.
     $!pending.subnegotiations.resolve: $subnegotiation;
 
-    # Update our state depending on the option.
-    given $subnegotiation.option {
-        when NAWS {
-            $!peer-width  = $subnegotiation.width;
-            $!peer-height = $subnegotiation.height;
-        }
-    }
+    # Handle parsing dependent on whether this is a server or a client 
+    self!update-host-state: $subnegotiation;
 }
+
+method !update-host-state(Net::Telnet::Subnegotiation $subnegotiation --> Nil) {...}
 
 method !parse-text(Str $data --> Nil) {
     await self.send: $data if $!options{ECHO}.enabled: :local;
@@ -269,20 +258,15 @@ method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promis
 method !send-subnegotiation(TelnetOption $option --> Promise) {
     $!pending.subnegotiations.request: $option;
 
-    my Net::Telnet::Subnegotiation $subnegotiation = do given $option {
-        when NAWS {
-            Net::Telnet::Subnegotiation::NAWS.new:
-                width  => $!host-width,
-                height => $!host-height
-        }
-        default {
-            Nil
-        }
-    };
+    # What the subnegotiation will be is dependent on whether this is a server
+    # or client.
+    my Net::Telnet::Subnegotiation $subnegotiation = self!update-peer-state: $option;
     return Promise.start({ 0 }) unless $subnegotiation.defined;
 
     self.send: $subnegotiation.serialize
 }
+
+method !update-peer-state(TelnetOption $option --> Net::Telnet::Subnegotiation) {...}
 
 method close(--> Bool) {
     $!socket.close

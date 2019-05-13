@@ -73,9 +73,14 @@ class Request does Awaitable {
 # a negotiation/subnegotiation's command and option.
 class Storage {
     my role TypedStorage[::TValue] is Hash[Request, TelnetOption] {
+        # Checks if a request exists or not.
+        method has(TelnetOption $option --> Bool) {
+            self.EXISTS-KEY: $option
+        }
+
         # Gets a request.
         method get(TelnetOption $option --> Request) {
-            self!throw unless self.EXISTS-KEY: $option;
+            self!throw: $option unless self.EXISTS-KEY: $option;
             self.AT-KEY: $option
         }
 
@@ -102,7 +107,7 @@ class Storage {
 
         # Removes a request. Call this after awaiting the response of a
         # request.
-        method remove(TelnetOption $option --> Nil) {
+        method remove(TelnetOption $option --> Request) {
             self!throw: $option unless self.EXISTS-KEY: $option;
             self.DELETE-KEY: $option;
         }

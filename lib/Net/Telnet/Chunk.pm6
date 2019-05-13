@@ -66,6 +66,13 @@ grammar Grammar {
         <option=.sym>
         <byte> ** 4
     }
+    token subnegotiation-data:sym(TERMINAL_TYPE) {
+        <option=.sym>
+        [
+        | <command=[\x[00]]> <byte>+
+        | <command=[\x[01]]>
+        ]
+    }
     token subnegotiation-data:sym<unsupported> {
         $<option>=[.]
         <byte>+
@@ -98,14 +105,14 @@ class Actions {
     }
 
     method command($/ --> Net::Telnet::Command) {
-        make Net::Telnet::Command.new(command => TelnetCommand(~$<command>))
+        my TelnetCommand $command = TelnetCommand(~$<command>);
+        make Net::Telnet::Command.new: :$command
     }
 
     method negotiation($/ --> Net::Telnet::Negotiation) {
-        make Net::Telnet::Negotiation.new(
-            command => TelnetCommand(~$<command>),
-            option  => TelnetOption(~$<option>)
-        )
+        my TelnetCommand $command = TelnetCommand(~$<command>);
+        my TelnetOption  $option = TelnetOption(~$<option>);
+        make Net::Telnet::Negotiation.new: :$command, :$option
     }
 
     method subnegotiation($/ --> Net::Telnet::Subnegotiation) {
@@ -116,15 +123,16 @@ class Actions {
         my @bytes  = $<byte>».ast;
         my $width  = @bytes[0] +< 8 +| @bytes[1];
         my $height = @bytes[2] +< 8 +| @bytes[3];
-        make Net::Telnet::Subnegotiation::NAWS.new:
-            :$width,
-            :$height;
+        make Net::Telnet::Subnegotiation::NAWS.new: :$width, :$height
+    }
+    method subnegotiation-data:sym(TERMINAL_TYPE)($/ --> Net::Telnet::Subnegotiation::TerminalType) {
+        my TerminalTypeCommand $command = TerminalTypeCommand(~$<command>.ord);
+        my Str                 $type    = $<byte>».ast ?? Blob.new($<byte>».ast).decode('latin1') !! Nil;
+        make Net::Telnet::Subnegotiation::TerminalType.new: :$command, :$type
     }
     method subnegotiation-data:sym<unsupported>($/ --> Net::Telnet::Subnegotiation::Unsupported) {
         my      $option = TelnetOption(~$<option>);
         my Blob $bytes .= new: $<byte>».ast;
-        make Net::Telnet::Subnegotiation::Unsupported.new:
-            :$option,
-            :$bytes;
+        make Net::Telnet::Subnegotiation::Unsupported.new: :$option, :$bytes
     }
 }

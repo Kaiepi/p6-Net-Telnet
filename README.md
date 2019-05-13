@@ -14,7 +14,7 @@ SYNOPSIS
 
     my Net::Telnet::Client $client .= new:
         :host<telehack.com>,
-        :preferred[NAWS],
+        :preferred[NAWS, TERMINAL_TYPE],
         :supported[SGA, ECHO];
     $client.text.tap({ .print });
 
@@ -25,7 +25,7 @@ SYNOPSIS
     my Net::Telnet::Server $server .= new:
         :host<localhost>,
         :preferred[SGA, ECHO],
-        :supported[NAWS];
+        :supported[NAWS, TERMINAL_TYPE];
 
     react {
         whenever $server.listen -> $connection {
@@ -62,9 +62,11 @@ The following options are currently supported:
 
   * TRANSMIT_BINARY
 
+  * ECHO
+
   * SGA
 
-  * ECHO
+  * TERMINAL_TYPE
 
   * NAWS
 

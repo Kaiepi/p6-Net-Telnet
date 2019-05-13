@@ -80,4 +80,7 @@ my enum TelnetOption is export (
     'EXOPL'               => 0xFF.chr
 );
 
-my Set constant SUBNEGOTIATORS is export(:ALL) .= new: NAWS;
+my enum TerminalTypeCommand is export(:ALL) (
+    'IS'   => 0,
+    'SEND' => 1
+);
