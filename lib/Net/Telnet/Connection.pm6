@@ -8,7 +8,6 @@ use Net::Telnet::Negotiation;
 use Net::Telnet::Option;
 use Net::Telnet::Pending;
 use Net::Telnet::Subnegotiation;
-use Net::Telnet::Terminal;
 unit role Net::Telnet::Connection;
 
 my Int constant SO_OOBINLINE = do given $*VM.osname {
@@ -97,50 +96,23 @@ method !on-connect(IO::Socket::Async $!socket) {
         setsockopt($fd, SOL_SOCKET, SO_OOBINLINE, $optval, nativesizeof(int32));
     }
 
-    $!host-width  = get-terminal-width;
-    $!host-height = get-terminal-height;
-    $!terminal    = signal(SIGWINCH).tap({
-        $!host-width  = get-terminal-width;
-        $!host-height = get-terminal-height;
-        if $!options{NAWS}.enabled: :local {
-            await self!send-subnegotiation(NAWS);
-            await $!pending.subnegotiations.get: NAWS;
-            $!pending.subnegotiations.remove: NAWS;
-        }
-    });
+    self!set-terminal-dimensions;
 
     self!send-initial-negotiations;
 
     self
 }
 
-method !send-initial-negotiations(--> Nil) {
-    for $!options.values -> $option {
-        if $option.preferred {
-            my TelnetCommand $command = $option.on-send-will;
-            if $command.defined {
-                await self!send-negotiation: $command, $option.option;
-                await $!pending.negotiations.get: $option.option;
-                $!pending.negotiations.remove: $option.option;
-            }
-        }
-        if $option.supported {
-            my TelnetCommand $command = $option.on-send-do;
-            if $command.defined {
-                await self!send-negotiation: $command, $option.option;
-                await $!pending.negotiations.get: $option.option;
-                $!pending.negotiations.remove: $option.option;
-            }
-        }
-    }
-}
+method !set-terminal-dimensions(--> Nil) {...}
+
+method !send-initial-negotiations(--> Nil) {...}
 
 method !on-close(--> Nil) {
     $!close-promise.keep;
     $!remainder .= new;
     $!text.done;
     $!binary.done;
-    $!terminal.close;
+    $!terminal.close if $!terminal.defined;
 }
 
 method !parse(Blob $incoming --> Nil) {

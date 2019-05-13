@@ -2,6 +2,7 @@ use v6.d;
 use Net::Telnet::Connection;
 use Net::Telnet::Constants :ALL;
 use Net::Telnet::Option;
+use Net::Telnet::Terminal;
 unit class Net::Telnet::Client does Net::Telnet::Connection;
 
 method connect(--> Promise) {
@@ -10,7 +11,21 @@ method connect(--> Promise) {
     })
 }
 
-method !send-initial-negotiations() {
+method !set-terminal-dimensions(--> Nil) {
+    $!host-width  = get-terminal-width;
+    $!host-height = get-terminal-height;
+    $!terminal    = signal(SIGWINCH).tap({
+        $!host-width  = get-terminal-width;
+        $!host-height = get-terminal-height;
+        if $!options{NAWS}.enabled: :local {
+            await self!send-subnegotiation(NAWS);
+            await $!pending.subnegotiations.get: NAWS;
+            $!pending.subnegotiations.remove: NAWS;
+        }
+    });
+}
+
+method !send-initial-negotiations(--> Nil) {
     # Wait for the server to send its initial negotiations before sending our
     # own. This is to avoid race conditions.
     sleep 3;

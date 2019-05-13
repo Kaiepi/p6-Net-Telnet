@@ -126,7 +126,7 @@ my Int $port = 8080;
         $supply.tap(-> $data {
             $out ~= $data;
         }, done => {
-            cmp-ok $out, 'eqv', $in, 'Can receive binary transmissions when TRANSMIT_BINARY is set as a preferred option';
+            cmp-ok $out, 'eqv', $in, 'Can receive binary transmissions when TRANSMIT_BINARY is set as a supported option';
             $p.keep;
         });
     });
@@ -150,7 +150,7 @@ my Int $port = 8080;
         :supported[ECHO];
 
     $client.text.tap({
-        pass 'Can receive text sent when ECHO is set as a preferred option';
+        pass 'Can receive text sent when ECHO is set as a supported option';
         $p.keep
     });
 

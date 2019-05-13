@@ -7,6 +7,30 @@ class Connection does Net::Telnet::Connection {
     trusts Net::Telnet::Server;
 
     has Int $.id;
+
+    # NAWS is only used by clients.
+    method !set-terminal-dimensions(--> Nil) {}
+
+    method !send-initial-negotiations(--> Nil) {
+        for $!options.values -> $option {
+            if $option.preferred {
+                my TelnetCommand $command = $option.on-send-will;
+                if $command.defined {
+                    await self!send-negotiation: $command, $option.option;
+                    await $!pending.negotiations.get: $option.option;
+                    $!pending.negotiations.remove: $option.option;
+                }
+            }
+            if $option.supported {
+                my TelnetCommand $command = $option.on-send-do;
+                if $command.defined {
+                    await self!send-negotiation: $command, $option.option;
+                    await $!pending.negotiations.get: $option.option;
+                    $!pending.negotiations.remove: $option.option;
+                }
+            }
+        }
+    }
 }
 
 has IO::Socket::Async::ListenSocket $.socket;
