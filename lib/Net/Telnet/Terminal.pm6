@@ -8,7 +8,7 @@ unit role Net::Telnet::Terminal;
 #
 # If you wish to implement proper terminal emulation, you'll need to wrap or
 # subclass Net::Telnet::Client and Net::Telnet::Client::Terminal and implement
-# the logic yourself. ncurses would be useful for this.
+# the logic yourself. You'll need to use a PTY for this.
 
 # Get/set the terminal type.
 method type(--> Str)   {...}
