@@ -21,9 +21,9 @@ constant TIOCGWINSZ = do {
 
 sub ioctl(int32, uint32, winsize is rw --> int32) is native {*}
 
-has Str $!type;
-has Int $!width;
-has Int $!height;
+has Str $.type          is rw;
+has Int $.width         is rw;
+has Int $.height        is rw;
 has Tap $!sigwinch-tap;
 
 submethod BUILD(Tap :$!sigwinch-tap) {
@@ -41,37 +41,17 @@ method new(&on-sigwinch) {
     self.bless: :$sigwinch-tap;
 }
 
-method type(--> Str) is raw {
-    Proxy.new(
-        FETCH => -> $ { $!type },
-        STORE => -> $, Str $type {
-            $!type = $type // %*ENV<TERM> // 'unknown';
-        }
-    )
-}
-
-method width(--> Int) is raw {
-    Proxy.new(
-        FETCH => -> $ { $!width },
-        STORE => -> $, Int $width {
-            $!width = $width // do {
-                my winsize $ws .= new;
-                ioctl($*OUT.native-descriptor, TIOCGWINSZ, $ws);
-                $ws.ws_col
-            };
-        }
-    )
-}
-
-method height(--> Int) is raw {
-    Proxy.new(
-        FETCH => -> $ { $!height },
-        STORE => -> $, Int $height {
-            $!height = $height // do {
-                my winsize $ws .= new;
-                ioctl($*OUT.native-descriptor, TIOCGWINSZ, $ws);
-                $ws.ws_row
-            };
-        }
-    )
+# Method exclusive to clients.
+method refresh(--> Nil) {
+    $!type   = %*ENV<TERM> // 'unknown';
+    $!width  = do {
+        my winsize $ws .= new;
+        ioctl($*OUT.native-descriptor, TIOCGWINSZ, $ws);
+        $ws.ws_col
+    };
+    $!height = do {
+        my winsize $ws .= new;
+        ioctl($*OUT.native-descriptor, TIOCGWINSZ, $ws);
+        $ws.ws_row
+    };
 }

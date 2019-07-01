@@ -26,10 +26,16 @@ my class CONSOLE_SCREEN_BUFFER_INFO is repr('CStruct') {
 sub GetStdHandle(int32 --> Pointer[void]) is native {*}
 sub GetConsoleScreenBufferInfo(Pointer[void], CONSOLE_SCREEN_BUFFER_INFO is rw --> int32) is native {*}
 
-has Str $!type;
-has Int $!width;
-has Int $!height;
+has Str $!type          is rw;
+has Int $!width         is rw;
+has Int $!height        is rw;
 has Tap $!sigwinch-tap;
+
+submethod BUILD(Tap :$!sigwinch-tap) {
+    $!type   = 'unknown';
+    $!width  = 0;
+    $!height = 0;
+}
 
 submethod DESTROY() {
     $!sigwinch-tap.close;
@@ -40,37 +46,20 @@ method new(&on-sigwinch) {
     self.bless: :$sigwinch-tap;
 }
 
-method type(--> Str) is raw {
-    Proxy.new(
-        FETCH => -> $ { $!type },
-        STORE => -> $, Str $type {
-            $!type = $type // 'unknown';
-        }
-    )
-}
-
-method width(--> Int) is raw {
-    Proxy.new(
-        FETCH => -> $ { $!width },
-        STORE => -> $, Int $width {
-            $!width = $width // do {
-                my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
-                GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);
-                $csbi.srWindow.Right - $csbi.srWindow.Left + 1
-            };
-        }
-    )
-}
-
-method height(--> Int) is raw {
-    Proxy.new(
-        FETCH => -> $ { $!height },
-        STORE => -> $, Int $height {
-            $!height = $height // do {
-                my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
-                GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);
-                $csbi.srWindow.Bottom - $csbi.srWindow.Top + 1
-            };
-        }
-    )
+# Method exclusive to clients.
+method refresh(--> Nil) {
+    # XXX: what would be an appropriate terminal type here? vt100 or something?
+    # It could depend on whether or not PowerShell or cmd is running. I can't
+    # tell without being able to test. Just set it to unknown for now.
+    $!type   = 'unknown';
+    $!width  = do {
+        my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
+        GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);
+        $csbi.srWindow.Right - $csbi.srWindow.Left + 1
+    };
+    $!height = do {
+        my CONSOLE_SCREEN_BUFFER_INFO $csbi .= new;
+        GetConsoleScreenBufferInfo(GetStdHandle($*OUT.native-descriptor), $csbi);
+        $csbi.srWindow.Bottom - $csbi.srWindow.Top + 1
+    };
 }

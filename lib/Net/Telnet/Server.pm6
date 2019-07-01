@@ -1,6 +1,7 @@
 use v6.d;
 use Net::Telnet::Connection;
 use Net::Telnet::Constants :ALL;
+use Net::Telnet::Terminal;
 use Net::Telnet::Terminal::Server;
 unit class Net::Telnet::Server;
 
@@ -107,9 +108,7 @@ method listen(--> Supply) {
     $!socket = IO::Socket::Async.listen($!host, $!port, :enc<latin1>).tap(-> $connection {
         self!on-connect: $connection;
     });
-
-    $!port = await $!socket.socket-port if $!port == 0;
-
+    $!port   = await $!socket.socket-port if $!port == 0;
     $!connections.Supply
 }
 
@@ -150,12 +149,14 @@ C<Net::Telnet::Server> is a class that creates TELNET servers.
 
     react {
         whenever $server.listen -> $connection {
-            $connection.text.tap(-> $text {
+            whenever $connection.text -> $text {
                 say "Received: $text";
                 $connection.close;
-            }, done => {
-                # Connection was closed; clean up if necessary.
-            });
+
+                LAST {
+                    # Connection was closed; clean up if necessary.
+                }
+            }
 
             LAST {
                 # Server was closed; clean up if necessary.

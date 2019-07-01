@@ -14,8 +14,4 @@ submethod BUILD() {
 
 submethod DESTROY() {}
 
-# "Where are the type/width/height methods that were stubbed in
-# Net::Telnet::Terminal?"
-# Don't forget, adding public attributes implicitly adds getter methods.
-
 # TODO: use PTYs to emulate client terminals here.

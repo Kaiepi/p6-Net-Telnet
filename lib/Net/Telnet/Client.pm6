@@ -16,11 +16,7 @@ method connect(--> Promise) {
 method !init-terminal(--> Net::Telnet::Terminal) {
     Net::Telnet::Terminal::Client.new({
         if $!options{NAWS}.enabled: :local {
-            # Reset the terminal width and height to whatever the new ones are.
-            # XXX: setting them to Nil to accomplish this is dumb; this should
-            # be done differently.
-            $!terminal.width  = Nil;
-            $!terminal.height = Nil;
+            $!terminal.refresh;
             await self!send-subnegotiation(NAWS);
             await $!pending.subnegotiations.get: NAWS;
             $!pending.subnegotiations.remove: NAWS;
