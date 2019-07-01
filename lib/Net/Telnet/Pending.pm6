@@ -29,15 +29,13 @@ class Request does Awaitable {
         }
     }
 
-    has Lock                    $!lock;
-    has Lock::ConditionVariable $!cond;
-    has Bool                    $!resolved;
-    has                         $!result;
-    has                         &!on-resolve;
+    has Lock $!lock;
+    has Bool $!resolved;
+    has      $!result;
+    has      &!on-resolve;
 
     submethod BUILD() {
         $!lock     := Lock.new;
-        $!cond     := $!lock.condition;
         $!resolved := False;
     }
 
@@ -46,7 +44,6 @@ class Request does Awaitable {
             $!resolved := True;
             $!result   := $negotiation;
             $*SCHEDULER.cue(&!on-resolve) if &!on-resolve.defined;
-            $!cond.signal_all;
         })
     }
 
