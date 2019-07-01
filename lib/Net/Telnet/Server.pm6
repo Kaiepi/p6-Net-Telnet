@@ -1,29 +1,11 @@
 use v6.d;
 use Net::Telnet::Connection;
 use Net::Telnet::Constants :ALL;
-use Net::Telnet::Terminal;
+use Net::Telnet::Terminal::Server;
 unit class Net::Telnet::Server;
 
 class Connection does Net::Telnet::Connection {
     trusts Net::Telnet::Server;
-
-    class Terminal does Net::Telnet::Terminal {
-        has Str $.type   is rw;
-        has Int $.width  is rw;
-        has Int $.height is rw;
-
-        submethod BUILD() {
-            $!type   = 'unknown';
-            $!width  = 0;
-            $!height = 0;
-        }
-
-        submethod DESTROY() {}
-
-        # "Where are the width and height methods? Aren't they still stubbed?"
-        # Remember, the width and height attributes are public; they add
-        # methods implicitly.
-    }
 
     # A unique identifier for this connection.
     #
@@ -31,6 +13,10 @@ class Connection does Net::Telnet::Connection {
     # been emitted to the Supply returned by Net::Telnet::Server.listen. This
     # allows you to do so yourself.
     has Int $.id;
+
+    method !init-terminal(--> Net::Telnet::Terminal) {
+        Net::Telnet::Terminal::Server.new
+    }
 
     method !send-initial-negotiations(--> Nil) {
         for $!options.values -> $option {
@@ -128,14 +114,12 @@ method listen(--> Supply) {
 }
 
 method !on-connect(IO::Socket::Async $socket --> Nil) {
-    my Int                  $id          = $!next-connection-id⚛++;
-    my Str                  $host        = $socket.peer-host;
-    my Int                  $port        = $socket.peer-port;
-    my Connection::Terminal $terminal   .= new;
-    my Connection           $connection .= new:
-        :$id, :$host, :$port, :@!preferred, :@!supported, :$terminal;
+    my Int        $id          = $!next-connection-id⚛++;
+    my Str        $host        = $socket.peer-host;
+    my Int        $port        = $socket.peer-port;
+    my Connection $connection .= new:
+        :$id, :$host, :$port, :@!preferred, :@!supported;
     $connection!Connection::on-connect: $socket;
-
     $!connections.emit: $connection;
 }
 

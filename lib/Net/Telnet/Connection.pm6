@@ -76,8 +76,11 @@ method new(
         my Bool         $preferred = @preferred ∋ $option;
         $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred;
     });
-    self.bless: :$host, :$port, :$options, :@supported, :@preferred, |%args;
+    my Net::Telnet::Terminal $terminal = self!init-terminal;
+    self.bless: :$host, :$port, :$options, :$terminal, :@supported, :@preferred, |%args;
 }
+
+method !init-terminal(--> Net::Telnet::Terminal) {...}
 
 method !on-connect(IO::Socket::Async $!socket) {
     $!socket.Supply(:bin).tap(-> $data {
@@ -196,7 +199,7 @@ method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation --> Nil
     # Resolve the pending subnegotiation, if any.
     $!pending.subnegotiations.resolve: $subnegotiation;
 
-    # Handle parsing dependent on whether this is a server or a client 
+    # Handle parsing dependent on whether this is a server or a client.
     self!update-host-state: $subnegotiation;
 }
 
@@ -306,25 +309,10 @@ This promise is kept once the connection is closed.
 A map of the state of all options the connection is aware of. Its shape is
 C«(Net::Telnet::Constants::TelnetOption => Net::Telnet::Option)».
 
-=item Int B<$.peer-width>
+=item Net::Telnet::Terminal B<$.terminal>
 
-The peer's terminal width. This is meaningless for Net::Telnet::Client since
-C<NAWS> is only supported by clients.
-
-=item Int B<$.peer-height>
-
-The peer's terminal height. This is meaningless for Net::Telnet::Client since
-C<NAWS> is only supported by clients.
-
-=item Int B<$.host-width>
-
-The host's terminal width. This is meaningless for
-Net::Telnet::Server::Connection since C<NAWS> is only supported by clients.
-
-=item Int B<$.host-height>
-
-The host's terminal height. This is meaningless for
-Net::Telnet::Server::Connection since C<NAWS> is only supported by clients.
+An object containing information about the (pseudo-)terminal used for the
+connection.
 
 =head1 METHODS
 
