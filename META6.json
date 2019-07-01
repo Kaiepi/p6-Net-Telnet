@@ -21,7 +21,13 @@
 		"Net::Telnet::Pending" : "lib/Net/Telnet/Pending.pm6",
 		"Net::Telnet::Server" : "lib/Net/Telnet/Server.pm6",
 		"Net::Telnet::Subnegotiation": "lib/Net/Telnet/Subnegotiation.pm6",
-		"Net::Telnet::Terminal" : "lib/Net/Telnet/Terminal.pm6"
+		"Net::Telnet::Terminal" : "lib/Net/Telnet/Terminal.pm6",
+		"Net::Telnet::Terminal::Client" : "lib/Net/Telnet/Terminal/Client.pm6",
+		"Net::Telnet::Terminal::Server" : "lib/Net/Telnet/Terminal/Server.pm6",
+		"Net::Telnet::Terminal::UNIX::Client" : "lib/Net/Telnet/Terminal/UNIX/Client.pm6",
+		"Net::Telnet::Terminal::UNIX::Server" : "lib/Net/Telnet/Terminal/UNIX/Server.pm6",
+		"Net::Telnet::Terminal::Win32::Client" : "lib/Net/Telnet/Terminal/Win32/Client.pm6",
+		"Net::Telnet::Terminal::Win32::Server" : "lib/Net/Telnet/Terminal/Win32/Server.pm6"
 	},
 	"resources" : [ ],
 	"source-url" : "https://github.com/Kaiepi/p6-Net-Telnet.git",
