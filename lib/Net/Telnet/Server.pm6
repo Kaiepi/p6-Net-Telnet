@@ -50,6 +50,18 @@ class Connection does Net::Telnet::Connection {
 
             $!pending.subnegotiations.remove: TERMINAL_TYPE;
         }
+
+        # Send "IAC SB TERMINAL_TYPE SEND IAC SE" and await a response from the
+        # client to set its terminal type.
+        if $!options{XDISPLOC}.enabled: :remote {
+            await self!send-subnegotiation: XDISPLOC;
+
+            my Net::Telnet::Subnegotiation::TerminalType $subnegotiation =
+                await $!pending.subnegotiations.get: XDISPLOC;
+            $!terminal.type = $subnegotiation.type;
+
+            $!pending.subnegotiations.remove: XDISPLOC;
+        }
     }
 
     method !update-host-state(Net::Telnet::Subnegotiation $subnegotiation --> Nil) {
@@ -60,6 +72,13 @@ class Connection does Net::Telnet::Connection {
             }
             when TERMINAL_TYPE {
                 if $subnegotiation.command != TerminalTypeCommand::IS {
+                    my Blob $data = $subnegotiation.serialize;
+                    X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$data).throw;
+                }
+                $!terminal.type = $subnegotiation.type;
+            }
+            when XDISPLOC {
+                if $subnegotiation.command != XDispLocCommand::IS {
                     my Blob $data = $subnegotiation.serialize;
                     X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$data).throw;
                 }

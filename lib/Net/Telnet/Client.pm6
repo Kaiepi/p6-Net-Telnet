@@ -49,6 +49,21 @@ method !send-initial-negotiations(--> Nil) {
         $!pending.subnegotiations.remove: TERMINAL_TYPE;
     }
 
+    # Check if we received "X-DISPLAY-LOCATION (XDISPLOC)" from the server.
+    # Reply with "X-DISPLAY-LOCATION (XDISPLOC)" if so.
+    if $!pending.subnegotiations.has: XDISPLOC {
+        my Net::Telnet::Subnegotiation::TerminalType $subnegotiation =
+            await $!pending.subnegotiations.remove: XDISPLOC;
+
+        if $subnegotiation.command != TerminalTypeCommand::SEND {
+            my Blob $data = $subnegotiation.serialize;
+            X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$data).throw;
+        }
+
+        await self!send-subnegotiation: XDISPLOC;
+        $!pending.subnegotiations.remove: XDISPLOC;
+    }
+
     # We don't care about the rest of the subnegotiations; they either don't
     # take a response or aren't supported.
     for $!pending.subnegotiations.kv -> $option, $request {

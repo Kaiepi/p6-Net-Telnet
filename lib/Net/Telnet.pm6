@@ -68,6 +68,7 @@ The following options are currently supported:
 =item ECHO
 =item SGA
 =item TERMINAL_TYPE
+=item XDISPLOC
 =item NAWS
 
 =head1 AUTHOR
