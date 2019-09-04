@@ -51,7 +51,7 @@ class Connection does Net::Telnet::Connection {
             $!pending.subnegotiations.remove: TERMINAL_TYPE;
         }
 
-        # Send "IAC SB TERMINAL_TYPE SEND IAC SE" and await a response from the
+        # Send "IAC SB X-DISPLAY-LOCATION SEND IAC SE" and await a response from the
         # client to set its terminal type.
         if $!options{XDISPLOC}.enabled: :remote {
             await self!send-subnegotiation: XDISPLOC;
@@ -92,6 +92,11 @@ class Connection does Net::Telnet::Connection {
             when TERMINAL_TYPE {
                 Net::Telnet::Subnegotiation::TerminalType.new(
                     command => TerminalTypeCommand::SEND
+                )
+            }
+            when XDISPLOC {
+                Net::Telnet::Subnegotiation::XDispLoc.new(
+                    command => XDispLocCommand::SEND
                 )
             }
             default {

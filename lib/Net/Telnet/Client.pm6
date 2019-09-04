@@ -49,8 +49,8 @@ method !send-initial-negotiations(--> Nil) {
         $!pending.subnegotiations.remove: TERMINAL_TYPE;
     }
 
-    # Check if we received "X-DISPLAY-LOCATION (XDISPLOC)" from the server.
-    # Reply with "X-DISPLAY-LOCATION (XDISPLOC)" if so.
+    # Check if we received "IAC SB X-DISPLAY-LOCATION SEND IAC SE" from the server.
+    # Reply with "IAC SB X-DISPLAY-LOCATION IS <ttype> IAC SE" if so.
     if $!pending.subnegotiations.has: XDISPLOC {
         my Net::Telnet::Subnegotiation::TerminalType $subnegotiation =
             await $!pending.subnegotiations.remove: XDISPLOC;
@@ -106,6 +106,12 @@ method !update-peer-state(TelnetOption $option --> Net::Telnet::Subnegotiation) 
         when TERMINAL_TYPE {
             Net::Telnet::Subnegotiation::TerminalType.new(
                 command => TerminalTypeCommand::IS,
+                type    => $!terminal.type
+            )
+        }
+        when XDISPLOC {
+            Net::Telnet::Subnegotiation::XDispLoc.new(
+                command => XDispLocCommand::IS,
                 type    => $!terminal.type
             )
         }
