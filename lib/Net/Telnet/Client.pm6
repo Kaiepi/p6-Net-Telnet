@@ -49,6 +49,21 @@ method !send-initial-negotiations(--> Nil) {
         $!pending.subnegotiations.remove: TERMINAL_TYPE;
     }
 
+    # Check if we received "IAC SB X-DISPLAY-LOCATION SEND IAC SE" from the server.
+    # Reply with "IAC SB X-DISPLAY-LOCATION IS <ttype> IAC SE" if so.
+    if $!pending.subnegotiations.has: XDISPLOC {
+        my Net::Telnet::Subnegotiation::TerminalType $subnegotiation =
+            await $!pending.subnegotiations.remove: XDISPLOC;
+
+        if $subnegotiation.command != TerminalTypeCommand::SEND {
+            my Blob $data = $subnegotiation.serialize;
+            X::Net::Telnet::ProtocolViolation.new(:$!host, :$!port, :$data).throw;
+        }
+
+        await self!send-subnegotiation: XDISPLOC;
+        $!pending.subnegotiations.remove: XDISPLOC;
+    }
+
     # We don't care about the rest of the subnegotiations; they either don't
     # take a response or aren't supported.
     for $!pending.subnegotiations.kv -> $option, $request {
@@ -91,6 +106,12 @@ method !update-peer-state(TelnetOption $option --> Net::Telnet::Subnegotiation) 
         when TERMINAL_TYPE {
             Net::Telnet::Subnegotiation::TerminalType.new(
                 command => TerminalTypeCommand::IS,
+                type    => $!terminal.type
+            )
+        }
+        when XDISPLOC {
+            Net::Telnet::Subnegotiation::XDispLoc.new(
+                command => XDispLocCommand::IS,
                 type    => $!terminal.type
             )
         }

@@ -82,6 +82,38 @@ module Net::Telnet {
         }
     }
 
+    class Subnegotiation::XDispLoc does Subnegotiation {
+        has XDispLocCommand $.command;
+        has Str                 $.type;
+
+        method new(TerminalTypeCommand :$command, Str :$type) {
+            my TelnetOption $option = XDISPLOC;
+            self.bless: :$option, :$command, :$type;
+        }
+
+        multi method gist(--> Str) {
+            given $!command {
+                when XDispLocCommand::IS {
+                    "{$!command.key} $!type"
+                }
+                when XDispLocCommand::SEND {
+                    $!command.key
+                }
+            }
+        }
+
+        multi method serialize(--> Blob) {
+            given $!command {
+                when XDispLocCommand::IS {
+                    Blob.new: $!command.value, |$!type.encode: 'latin1'
+                }
+                when XDispLocCommand::SEND {
+                    Blob.new: $!command.value
+                }
+            }
+        }
+    }
+
     class Subnegotiation::Unsupported does Subnegotiation {
         has Blob $.bytes;
 
