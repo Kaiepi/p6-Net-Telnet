@@ -1,9 +1,10 @@
 use v6.d;
 use Net::Telnet::Constants :ALL;
 use Net::Telnet::Exceptions;
+use Net::Telnet::Option;
 use Net::Telnet::Negotiation;
 use Net::Telnet::Subnegotiation;
-unit class Net::Telnet::Pending;
+unit class Net::Telnet::Context;
 
 # Request represents a negotiation/subnegotiation awaiting a response from the
 # peer. Requests can be used with await to get the command the peer replies
@@ -68,7 +69,7 @@ class Request does Awaitable {
 # Storage is a Hash of TelnetOption to Request. It features helper methods for
 # creating new requests, resolving requests, and awaiting their response given
 # a negotiation/subnegotiation's command and option.
-class Storage {
+my class Storage {
     my role TypedStorage[::TValue] is Hash[Request, TelnetOption] {
         # Checks if a request exists or not.
         method has(TelnetOption $option --> Bool) {
@@ -116,12 +117,36 @@ class Storage {
         }
     }
 
-    method ^parameterize(Mu:U \this, Mu \T) {
-        my $type := this.^mixin: TypedStorage[T];
-        $type.^set_name: this.^name ~ '[' ~ T.^name ~ ']';
-        $type
+    method ^parameterize(Storage:U $this is raw, Mu $type is raw) {
+        my Storage:U $mixin := $this.^mixin: TypedStorage.^parameterize: $type;
+        $mixin.^set_name: $this.^name ~ '[' ~ $type.^name ~ ']';
+        say $mixin;
+        $mixin
     }
 }
 
-has Storage[Net::Telnet::Negotiation]    $.negotiations    .= new;
-has Storage[Net::Telnet::Subnegotiation] $.subnegotiations .= new;
+my constant Negotiation    = Net::Telnet::Negotiation;
+my constant Subnegotiation = Net::Telnet::Subnegotiation;
+
+# XXX: should use `has TelnetOption:D @ is Set` etc. once that works (again?).
+has Set:D[TelnetOption:D]     $.preferred               is required;
+has Set:D[TelnetOption:D]     $.supported               is required;
+has Net::Telnet::Option:D     %.options{TelnetOption:D} is required;
+has Storage[Negotiation:D]    $.negotiations            is required;
+has Storage[Subnegotiation:D] $.subnegotiations         is required;
+
+submethod BUILD(::?CLASS:D: :@preferred!, :@supported!) {
+    $!preferred       .= new: @preferred;
+    $!supported       .= new: @supported;
+    %!options          = TelnetOption.^enum_value_list.map(-> TelnetOption:D $option {
+        my Bool:D $supported = $!supported ∋ $option;
+        my Bool:D $preferred = $!preferred ∋ $option;
+        $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred
+    });
+    $!negotiations    .= new;
+    $!subnegotiations .= new;
+}
+
+method new(::?CLASS:_: :@preferred, :@supported --> ::?CLASS:D) {
+    self.bless: :@preferred, :@supported
+}

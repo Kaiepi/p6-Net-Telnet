@@ -2,11 +2,11 @@ use v6.d;
 use NativeCall;
 use Net::Telnet::Chunk;
 use Net::Telnet::Command;
+use Net::Telnet::Context;
 use Net::Telnet::Constants :ALL;
 use Net::Telnet::Exceptions;
 use Net::Telnet::Negotiation;
 use Net::Telnet::Option;
-use Net::Telnet::Pending;
 use Net::Telnet::Subnegotiation;
 use Net::Telnet::Terminal;
 unit role Net::Telnet::Connection;
@@ -31,14 +31,13 @@ has Supplier $!text          .= new;
 has Supplier $!binary        .= new;
 has Supplier $!current-binary;
 
+has TelnetOption @.supported;
+has TelnetOption @.preferred;
+
 has Net::Telnet::Chunk::Actions $!actions   .= new;
 has Blob                        $!remainder .= new;
 
-has Map                  $.options;
-has TelnetOption         @.preferred;
-has TelnetOption         @.supported;
-has Net::Telnet::Pending $.pending    .= new;
-
+has Net::Telnet::Context  $.context;
 has Net::Telnet::Terminal $.terminal;
 
 method closed(--> Bool) {
@@ -61,23 +60,24 @@ method preferred(TelnetOption $option --> Bool) {
     @!preferred ∋ $option
 }
 
+method options(--> Hash:D[Net::Telnet::Option:D, TelnetOption:D]) {
+    $!context.options
+}
+
 method new(
-    Str :$host = 'localhost',
-    Int :$port = 23,
-        :$preferred = [],
-        :$supported = [],
+    Str :$host      = 'localhost',
+    Int :$port      = 23,
+        :@preferred = [],
+        :@supported = [],
         *%args
 ) {
-    my TelnetOption @preferred = |$preferred;
-    my TelnetOption @supported = |$supported;
-    my Map $options  .= new: TelnetOption.enums.kv.map(-> $k, $v {
-        my TelnetOption $option    = TelnetOption($v);
-        my Bool         $supported = @supported ∋ $option;
-        my Bool         $preferred = @preferred ∋ $option;
-        $option => Net::Telnet::Option.new: :$option, :$supported, :$preferred;
-    });
-    my Net::Telnet::Terminal $terminal = self!init-terminal;
-    self.bless: :$host, :$port, :$options, :$terminal, :@supported, :@preferred, |%args;
+    my Net::Telnet::Context  $context  .= new: :@preferred, :@supported;
+    my Net::Telnet::Terminal $terminal  = self!init-terminal;
+    self.bless:
+        :$host, :$port,
+        :$context, :$terminal,
+        :@supported, :@preferred,
+        |%args;
 }
 
 method !init-terminal(--> Net::Telnet::Terminal) {...}
@@ -151,11 +151,11 @@ method !parse-command(Net::Telnet::Command $command --> Nil) {
 }
 
 method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Nil) {
-    # Resolve the pending negotiation, if any.
-    $!pending.negotiations.resolve: $negotiation;
+    # Resolve the context negotiation, if any.
+    $!context.negotiations.resolve: $negotiation;
 
     # Update our option state.
-    my Net::Telnet::Option $option = $!options{$negotiation.option};
+    my Net::Telnet::Option $option = $!context.options{$negotiation.option};
     my TelnetCommand $command = do given $negotiation.command {
         when DO   { $option.on-receive-do   }
         when DONT { $option.on-receive-dont }
@@ -196,8 +196,8 @@ method !parse-negotiation(Net::Telnet::Negotiation $negotiation --> Nil) {
 }
 
 method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation --> Nil) {
-    # Resolve the pending subnegotiation, if any.
-    $!pending.subnegotiations.resolve: $subnegotiation;
+    # Resolve the context subnegotiation, if any.
+    $!context.subnegotiations.resolve: $subnegotiation;
 
     # Handle parsing dependent on whether this is a server or a client.
     self!update-host-state: $subnegotiation;
@@ -206,7 +206,7 @@ method !parse-subnegotiation(Net::Telnet::Subnegotiation $subnegotiation --> Nil
 method !update-host-state(Net::Telnet::Subnegotiation $subnegotiation --> Nil) {...}
 
 method !parse-text(Str $data --> Nil) {
-    await self.send: $data if $!options{ECHO}.enabled: :local;
+    await self.send: $data if $!context.options{ECHO}.enabled: :local;
     $!text.emit: $data;
 }
 
@@ -230,12 +230,12 @@ method send-text(Str $data --> Promise) {
 
 method send-binary(Blob $data --> Promise) {
     start {
-        if $!options{TRANSMIT_BINARY}.disabled: :local {
+        if $!context.options{TRANSMIT_BINARY}.disabled: :local {
             my Net::Telnet::Negotiation $negotiation;
 
             await self!send-negotiation: WILL, TRANSMIT_BINARY;
-            $negotiation = await $!pending.negotiations.get: TRANSMIT_BINARY;
-            $!pending.negotiations.remove: TRANSMIT_BINARY;
+            $negotiation = await $!context.negotiations.get: TRANSMIT_BINARY;
+            $!context.negotiations.remove: TRANSMIT_BINARY;
 
             if $negotiation.command ne DO {
                 X::Net::Telnet::TransmitBinary.new(:$!host, :$!port).throw;
@@ -252,14 +252,14 @@ method send-binary(Blob $data --> Promise) {
 }
 
 method !send-negotiation(TelnetCommand $command, TelnetOption $option --> Promise) {
-    $!pending.negotiations.request: $option;
+    $!context.negotiations.request: $option;
 
     my Net::Telnet::Negotiation $negotiation .= new: :$command, :$option;
     self.send: $negotiation.serialize
 }
 
 method !send-subnegotiation(TelnetOption $option --> Promise) {
-    $!pending.subnegotiations.request: $option;
+    $!context.subnegotiations.request: $option;
 
     # What the subnegotiation will be is dependent on whether this is a server
     # or client.

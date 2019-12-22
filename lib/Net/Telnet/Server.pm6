@@ -20,35 +20,35 @@ class Connection does Net::Telnet::Connection {
     }
 
     method !send-initial-negotiations(--> Nil) {
-        for $!options.values -> $option {
+        for $!context.options.values -> $option {
             if $option.preferred {
                 my TelnetCommand $command = $option.on-send-will;
                 if $command.defined {
                     await self!send-negotiation: $command, $option.option;
-                    await $!pending.negotiations.get: $option.option;
-                    $!pending.negotiations.remove: $option.option;
+                    await $!context.negotiations.get: $option.option;
+                    $!context.negotiations.remove: $option.option;
                 }
             }
             if $option.supported {
                 my TelnetCommand $command = $option.on-send-do;
                 if $command.defined {
                     await self!send-negotiation: $command, $option.option;
-                    await $!pending.negotiations.get: $option.option;
-                    $!pending.negotiations.remove: $option.option;
+                    await $!context.negotiations.get: $option.option;
+                    $!context.negotiations.remove: $option.option;
                 }
             }
         }
 
         # Send "IAC SB TERMINAL_TYPE SEND IAC SE" and await a response from the
         # client to set its terminal type.
-        if $!options{TERMINAL_TYPE}.enabled: :remote {
+        if $!context.options{TERMINAL_TYPE}.enabled: :remote {
             await self!send-subnegotiation: TERMINAL_TYPE;
 
             my Net::Telnet::Subnegotiation::TerminalType $subnegotiation =
-                await $!pending.subnegotiations.get: TERMINAL_TYPE;
+                await $!context.subnegotiations.get: TERMINAL_TYPE;
             $!terminal.type = $subnegotiation.type;
 
-            $!pending.subnegotiations.remove: TERMINAL_TYPE;
+            $!context.subnegotiations.remove: TERMINAL_TYPE;
         }
     }
 

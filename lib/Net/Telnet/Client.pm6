@@ -15,11 +15,11 @@ method connect(--> Promise) {
 
 method !init-terminal(--> Net::Telnet::Terminal) {
     Net::Telnet::Terminal::Client.new({
-        if $!options{NAWS}.enabled: :local {
+        if $!context.options{NAWS}.enabled: :local {
             $!terminal.refresh;
             await self!send-subnegotiation(NAWS);
-            await $!pending.subnegotiations.get: NAWS;
-            $!pending.subnegotiations.remove: NAWS;
+            await $!context.subnegotiations.get: NAWS;
+            $!context.subnegotiations.remove: NAWS;
         }
     })
 }
@@ -30,15 +30,15 @@ method !send-initial-negotiations(--> Nil) {
     sleep 3;
 
     # We don't care about the results of the initial negotiations.
-    for $!pending.negotiations.keys -> $option {
-        $!pending.negotiations.remove: $option;
+    for $!context.negotiations.keys -> $option {
+        $!context.negotiations.remove: $option;
     }
 
     # Check if we received "IAC SB TERMINAL_TYPE SEND IAC SE" from the server.
     # Reply with "IAC SB TERMINAL_TYPE IS <ttype> IAC SE" if so.
-    if $!pending.subnegotiations.has: TERMINAL_TYPE {
+    if $!context.subnegotiations.has: TERMINAL_TYPE {
         my Net::Telnet::Subnegotiation::TerminalType $subnegotiation =
-            await $!pending.subnegotiations.remove: TERMINAL_TYPE;
+            await $!context.subnegotiations.remove: TERMINAL_TYPE;
 
         if $subnegotiation.command != TerminalTypeCommand::SEND {
             my Blob $data = $subnegotiation.serialize;
@@ -46,31 +46,31 @@ method !send-initial-negotiations(--> Nil) {
         }
 
         await self!send-subnegotiation: TERMINAL_TYPE;
-        $!pending.subnegotiations.remove: TERMINAL_TYPE;
+        $!context.subnegotiations.remove: TERMINAL_TYPE;
     }
 
     # We don't care about the rest of the subnegotiations; they either don't
     # take a response or aren't supported.
-    for $!pending.subnegotiations.kv -> $option, $request {
-        $!pending.subnegotiations.remove: $option;
+    for $!context.subnegotiations.kv -> $option, $request {
+        $!context.subnegotiations.remove: $option;
     }
 
     # Negotiate any remaining options.
-    for $!options.values -> $option {
+    for $!context.options.values -> $option {
         if $option.preferred && $option.disabled: :local {
             my TelnetCommand $command = $option.on-send-will;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
-                await $!pending.negotiations.get: $option.option;
-                $!pending.negotiations.remove: $option.option;
+                await $!context.negotiations.get: $option.option;
+                $!context.negotiations.remove: $option.option;
             }
         }
         if $option.supported && $option.disabled: :remote {
             my TelnetCommand $command = $option.on-send-do;
             if $command.defined {
                 await self!send-negotiation: $command, $option.option;
-                await $!pending.negotiations.get: $option.option;
-                $!pending.negotiations.remove: $option.option;
+                await $!context.negotiations.get: $option.option;
+                $!context.negotiations.remove: $option.option;
             }
         }
     }
